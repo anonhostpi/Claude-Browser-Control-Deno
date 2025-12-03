@@ -124,3 +124,28 @@ instanceRoutes.delete("/:browser/:profile", async (c) => {
 
   return c.body(null, 204);
 });
+
+/** Create new target (tab) */
+instanceRoutes.post("/:browser/:profile", async (c) => {
+  const browser = c.req.param("browser");
+  const profile = c.req.param("profile");
+
+  const instance = registry.get({ browser, profile });
+  if (!instance) {
+    return c.json({ error: "Instance not running" }, 404);
+  }
+
+  const body = await c.req.json().catch(() => ({}));
+  const url = body.url ?? "about:blank";
+
+  const target = await createTarget(url, {
+    port: instance.launched.debuggingPort,
+  });
+
+  return c.json({
+    id: target.id,
+    type: target.type,
+    title: target.title,
+    url: target.url,
+  }, 201);
+});
