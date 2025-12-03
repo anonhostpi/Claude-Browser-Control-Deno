@@ -5,7 +5,8 @@
   "tasks": {
     "dev": "deno run --watch --allow-read --allow-write --allow-env --allow-net --allow-run main.ts",
     "start": "deno run --allow-read --allow-write --allow-env --allow-net --allow-run main.ts",
-    "info": "deno run --allow-read --allow-env main.ts info",
+    "serve": "deno run --allow-read --allow-write --allow-env --allow-net --allow-run main.ts serve",
+    "info": "deno run --allow-read --allow-write --allow-env --allow-net --allow-run main.ts info",
     "launch": "deno run --allow-read --allow-write --allow-env --allow-net --allow-run main.ts launch",
     "repl": "deno repl --allow-read --allow-write --allow-env --allow-net --allow-run --eval=\"import * as browser from './src/mod.ts';\"",
     "test": "deno test --allow-read --allow-write --allow-env --allow-net --allow-run",
