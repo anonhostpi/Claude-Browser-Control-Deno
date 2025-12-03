@@ -12,3 +12,12 @@ Thumbs.db
 
 # Build artifacts
 dist/
+
+# Documentation (generated)
+docs/
+
+# Test coverage
+coverage/
+
+# Temporary files
+temp/
