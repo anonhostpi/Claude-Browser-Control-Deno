@@ -1,21 +1,112 @@
 # Claude-Browser-Control-Deno
 
-A Deno project for browser control with Claude.
+A Deno library for controlling Chrome-based browsers via Chrome DevTools Protocol (CDP).
 
-## Getting Started
+## Features
 
-### Prerequisites
+- **OS Detection**: Automatically detects Windows, macOS, or Linux
+- **Browser Discovery**: Finds installed Chrome-based browsers (Chrome, Edge, Brave, Chromium, Vivaldi)
+- **Profile Management**: Discovers browser profiles, operates under a dedicated "Claude" profile by default
+- **CDP Integration**: Launch browsers with remote debugging and control via CDP WebSocket
 
-- [Deno](https://deno.land/) installed
+## Prerequisites
 
-### Running
+- [Deno](https://deno.land/) v1.40+
+- At least one Chrome-based browser installed
+
+## Quick Start
 
 ```bash
-# Development mode with watch
-deno task dev
+# Show system info and installed browsers
+deno task info
 
-# Production
-deno task start
+# Launch browser with CDP debugging (uses default browser + Claude profile)
+deno task launch
+
+# Launch specific browser with specific profile
+deno task start launch --browser edge --profile "Default"
+
+# Open a URL
+deno task start launch --url https://example.com
+```
+
+## Usage as Library
+
+```typescript
+import {
+  discoverBrowsers,
+  getDefaultBrowser,
+  getProfile,
+  launchBrowser,
+  CDPClient,
+} from "./src/mod.ts";
+
+// Discover browsers
+const browsers = await discoverBrowsers();
+console.log("Installed browsers:", browsers.map(b => b.name));
+
+// Get default browser
+const browser = await getDefaultBrowser();
+
+// Get Claude profile (creates if needed)
+const profile = await getProfile(browser);
+
+// Launch with CDP
+const launched = await launchBrowser({
+  browser,
+  profile,
+  startUrl: "https://example.com",
+});
+
+// Connect CDP client
+const cdp = await CDPClient.connect(launched.wsEndpoint);
+
+// Navigate to a page
+await cdp.send("Page.navigate", { url: "https://example.com" });
+
+// Clean up
+cdp.close();
+await launched.close();
+```
+
+## CLI Commands
+
+| Command | Description |
+|---------|-------------|
+| `info` | Show system info and installed browsers |
+| `launch` | Launch browser with CDP debugging |
+| `help` | Show help message |
+
+## CLI Options
+
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--browser` | `-b` | Browser type: chrome, edge, brave, chromium, vivaldi |
+| `--profile` | `-p` | Profile name (default: "Claude") |
+| `--url` | `-u` | URL to open on launch |
+| `--help` | `-h` | Show help message |
+
+## Supported Browsers
+
+- Google Chrome
+- Microsoft Edge
+- Brave Browser
+- Chromium
+- Vivaldi
+
+## Deno REPL Usage
+
+Start the REPL with the library pre-loaded:
+
+```bash
+deno task repl
+```
+
+Then use the imported `browser` namespace:
+
+```typescript
+> const browsers = await browser.discoverBrowsers()
+> console.log(browsers)
 ```
 
 ## License
