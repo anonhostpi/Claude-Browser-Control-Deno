@@ -21,7 +21,8 @@
     "@std/path": "jsr:@std/path@^1",
     "@std/assert": "jsr:@std/assert@^1",
     "@std/testing": "jsr:@std/testing@^1",
-    "chrome-remote-interface": "npm:chrome-remote-interface@^0.33.3"
+    "chrome-remote-interface": "npm:chrome-remote-interface@^0.33.3",
+    "hono": "jsr:@hono/hono@^4"
   },
   "compilerOptions": {
     "strict": true
