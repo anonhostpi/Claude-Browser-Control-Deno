@@ -10,7 +10,8 @@ import {
   getProfile,
   discoverProfiles,
   launchBrowser,
-  CDPClient,
+  connect,
+  getVersion,
 } from "./src/mod.ts";
 
 async function showSystemInfo(): Promise<void> {
@@ -83,19 +84,19 @@ async function launchAndConnect(
 
   // Connect CDP client
   console.log("\nConnecting CDP client...");
-  const cdp = await CDPClient.connect(launched.wsEndpoint);
+  const cdp = await connect({ port: launched.debuggingPort });
   console.log("CDP connected!");
 
   // Get browser version info
-  const version = await cdp.send("Browser.getVersion");
-  console.log("\nBrowser Version:", version);
+  const version = await getVersion({ port: launched.debuggingPort });
+  console.log("\nBrowser Version:", version.Browser);
 
   // Keep running until user exits
   console.log("\nBrowser is running. Press Ctrl+C to exit.");
   
   Deno.addSignalListener("SIGINT", async () => {
     console.log("\nClosing browser...");
-    cdp.close();
+    await cdp.close();
     await launched.close();
     Deno.exit(0);
   });
