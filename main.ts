@@ -2,107 +2,25 @@
  * Claude Browser Control - CLI Entry Point
  */
 
-import {
-  detectOS,
-  discoverBrowsers,
-  getDefaultBrowser,
-  getBrowser,
-  getProfile,
-  discoverProfiles,
-  launchBrowser,
-  connect,
-  getVersion,
-} from "./src/mod.ts";
+import { startServer } from "./src/server/mod.ts";
+import { ensureServer } from "./src/cli/mod.ts";
 
-async function showSystemInfo(): Promise<void> {
-  const os = detectOS();
-  console.log("\n=== System Info ===");
-  console.log(`Platform: ${os.platform}`);
-  console.log(`Home: ${os.homeDir}`);
-  if (os.localAppData) {
-    console.log(`LocalAppData: ${os.localAppData}`);
-  }
-}
-
-async function showBrowsers(): Promise<void> {
-  console.log("\n=== Installed Browsers ===");
-  const browsers = await discoverBrowsers();
-  
-  if (browsers.length === 0) {
-    console.log("No Chrome-based browsers found.");
-    return;
-  }
-
-  for (const browser of browsers) {
-    console.log(`\n${browser.name} (${browser.type})`);
-    console.log(`  Executable: ${browser.executablePath}`);
-    console.log(`  User Data: ${browser.userDataDir}`);
-    
-    const profiles = await discoverProfiles(browser);
-    console.log(`  Profiles (${profiles.length}):`);
-    for (const profile of profiles) {
-      const indicator = profile.isDefault ? " [default]" : "";
-      const displayName = profile.displayName !== profile.name 
-        ? ` (${profile.displayName})`
-        : "";
-      console.log(`    - ${profile.name}${displayName}${indicator}`);
+function parseFlags(args: string[]): Record<string, string> {
+  const flags: Record<string, string> = {};
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg.startsWith("--")) {
+      const eqIdx = arg.indexOf("=");
+      if (eqIdx > 0) {
+        flags[arg.slice(2, eqIdx)] = arg.slice(eqIdx + 1);
+      } else {
+        flags[arg.slice(2)] = args[++i] ?? "";
+      }
+    } else if (arg.startsWith("-") && arg.length === 2) {
+      flags[arg.slice(1)] = args[++i] ?? "";
     }
   }
-}
-
-async function launchAndConnect(
-  browserType?: string,
-  profileName?: string,
-  url?: string
-): Promise<void> {
-  // Get browser
-  const browser = browserType 
-    ? await getBrowser(browserType)
-    : await getDefaultBrowser();
-
-  if (!browser) {
-    console.error("No browser found.");
-    Deno.exit(1);
-  }
-
-  console.log(`\nUsing browser: ${browser.name}`);
-
-  // Get profile (defaults to "Claude")
-  const profile = await getProfile(browser, profileName);
-  console.log(`Using profile: ${profile.displayName} (${profile.path})`);
-
-  // Launch browser
-  const launched = await launchBrowser({
-    browser,
-    profile,
-    startUrl: url ?? "about:blank",
-  });
-
-  console.log(`\nBrowser launched successfully!`);
-  console.log(`Debugging port: ${launched.debuggingPort}`);
-  console.log(`WebSocket: ${launched.wsEndpoint}`);
-
-  // Connect CDP client
-  console.log("\nConnecting CDP client...");
-  const cdp = await connect({ port: launched.debuggingPort });
-  console.log("CDP connected!");
-
-  // Get browser version info
-  const version = await getVersion({ port: launched.debuggingPort });
-  console.log("\nBrowser Version:", version.Browser);
-
-  // Keep running until user exits
-  console.log("\nBrowser is running. Press Ctrl+C to exit.");
-  
-  Deno.addSignalListener("SIGINT", async () => {
-    console.log("\nClosing browser...");
-    await cdp.close();
-    await launched.close();
-    Deno.exit(0);
-  });
-
-  // Keep process alive
-  await new Promise(() => {});
+  return flags;
 }
 
 function showHelp(): void {
@@ -113,56 +31,145 @@ USAGE:
   deno task start [command] [options]
 
 COMMANDS:
-  info              Show system info and installed browsers
-  launch            Launch a browser with CDP debugging enabled
+  serve             Start the API server
+  info              List browsers and profiles
+  launch            Launch a browser instance
+  close             Close a browser instance
+  targets           List targets in an instance
+  navigate          Navigate a target to URL
 
-OPTIONS:
+SERVER OPTIONS:
+  --port            Server port (default: 9333)
+  --parent-pid      Exit when parent PID dies
+
+BROWSER OPTIONS:
   --browser, -b     Browser type: chrome, edge, brave, chromium, vivaldi
   --profile, -p     Profile name (default: "Claude")
-  --url, -u         URL to open on launch
-  --help, -h        Show this help message
+  --url, -u         URL to open or navigate to
+  --target, -t      Target ID for target operations
+  --headless        Run browser in headless mode
 
 EXAMPLES:
+  deno task start serve
   deno task start info
-  deno task start launch
-  deno task start launch --browser edge --profile "Work"
-  deno task start launch -b chrome -u https://example.com
+  deno task start launch -b chrome -p Claude
+  deno task start targets -b chrome -p Claude
+  deno task start navigate -b chrome -p Claude -t <id> -u https://example.com
+  deno task start close -b chrome -p Claude
 `);
+}
+
+async function runServe(flags: Record<string, string>): Promise<void> {
+  const port = flags.port ? parseInt(flags.port) : undefined;
+  const parentPid = flags["parent-pid"] ? parseInt(flags["parent-pid"]) : undefined;
+  await startServer({ port, parentPid });
+}
+
+async function runInfo(): Promise<void> {
+  const { client } = await ensureServer();
+  const data = await client.listBrowsers() as { browsers: Array<{ type: string; name: string }> };
+  
+  console.log("\n=== Available Browsers ===");
+  for (const browser of data.browsers) {
+    const info = await client.getBrowser(browser.type) as {
+      name: string;
+      path: string;
+      profiles: Array<{ name: string; displayName: string; isDefault: boolean }>;
+    };
+    console.log(`\n${info.name}`);
+    console.log(`  Path: ${info.path}`);
+    console.log(`  Profiles:`);
+    for (const p of info.profiles) {
+      const marker = p.isDefault ? " [default]" : "";
+      console.log(`    - ${p.displayName}${marker}`);
+    }
+  }
+}
+
+async function runLaunch(flags: Record<string, string>): Promise<void> {
+  const browser = flags.browser ?? flags.b ?? "chrome";
+  const profile = flags.profile ?? flags.p ?? "Claude";
+  const headless = "headless" in flags;
+
+  const { client } = await ensureServer();
+  const result = await client.launchInstance(browser, profile, { headless });
+  console.log(JSON.stringify(result, null, 2));
+}
+
+async function runClose(flags: Record<string, string>): Promise<void> {
+  const browser = flags.browser ?? flags.b ?? "chrome";
+  const profile = flags.profile ?? flags.p ?? "Claude";
+
+  const { client } = await ensureServer();
+  await client.closeInstance(browser, profile);
+  console.log("Instance closed.");
+}
+
+async function runTargets(flags: Record<string, string>): Promise<void> {
+  const browser = flags.browser ?? flags.b ?? "chrome";
+  const profile = flags.profile ?? flags.p ?? "Claude";
+
+  const { client } = await ensureServer();
+  const result = await client.getInstance(browser, profile) as {
+    targets: Array<{ id: string; type: string; title: string; url: string }>;
+  };
+  
+  console.log("\n=== Targets ===");
+  for (const t of result.targets) {
+    console.log(`\n[${t.type}] ${t.id}`);
+    console.log(`  Title: ${t.title}`);
+    console.log(`  URL: ${t.url}`);
+  }
+}
+
+async function runNavigate(flags: Record<string, string>): Promise<void> {
+  const browser = flags.browser ?? flags.b ?? "chrome";
+  const profile = flags.profile ?? flags.p ?? "Claude";
+  const target = flags.target ?? flags.t;
+  const url = flags.url ?? flags.u;
+
+  if (!target) {
+    console.error("Error: --target required");
+    Deno.exit(1);
+  }
+  if (!url) {
+    console.error("Error: --url required");
+    Deno.exit(1);
+  }
+
+  const { client } = await ensureServer();
+  await client.navigate(browser, profile, target, url);
+  console.log(`Navigated to ${url}`);
 }
 
 async function main(): Promise<void> {
   const args = Deno.args;
   const command = args[0];
+  const flags = parseFlags(args.slice(1));
 
-  // Parse flags
-  const flags: Record<string, string> = {};
-  for (let i = 1; i < args.length; i++) {
-    const arg = args[i];
-    if (arg.startsWith("--")) {
-      const [key, value] = arg.slice(2).split("=");
-      flags[key] = value ?? args[++i] ?? "";
-    } else if (arg.startsWith("-")) {
-      const key = arg.slice(1);
-      flags[key] = args[++i] ?? "";
-    }
-  }
-
-  // Handle shortcuts
-  if (flags.b) flags.browser = flags.b;
-  if (flags.p) flags.profile = flags.p;
-  if (flags.u) flags.url = flags.u;
-  if (flags.h) {
+  if (flags.h || flags.help) {
     showHelp();
     return;
   }
 
   switch (command) {
+    case "serve":
+      await runServe(flags);
+      break;
     case "info":
-      await showSystemInfo();
-      await showBrowsers();
+      await runInfo();
       break;
     case "launch":
-      await launchAndConnect(flags.browser, flags.profile, flags.url);
+      await runLaunch(flags);
+      break;
+    case "close":
+      await runClose(flags);
+      break;
+    case "targets":
+      await runTargets(flags);
+      break;
+    case "navigate":
+      await runNavigate(flags);
       break;
     case "help":
     case "--help":
