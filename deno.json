@@ -1,13 +1,39 @@
 {
   "name": "@anonhostpi/claude-browser-control-deno",
   "version": "0.1.0",
-  "exports": "./main.ts",
+  "exports": "./src/mod.ts",
   "tasks": {
-    "dev": "deno run --watch main.ts",
-    "start": "deno run main.ts"
+    "dev": "deno run --watch --allow-read --allow-write --allow-env --allow-net --allow-run main.ts",
+    "start": "deno run --allow-read --allow-write --allow-env --allow-net --allow-run main.ts",
+    "info": "deno run --allow-read --allow-env main.ts info",
+    "launch": "deno run --allow-read --allow-write --allow-env --allow-net --allow-run main.ts launch",
+    "repl": "deno repl --allow-read --allow-write --allow-env --allow-net --allow-run --eval=\"import * as browser from './src/mod.ts';\"",
+    "lint": "deno lint",
+    "fmt": "deno fmt",
+    "fmt:check": "deno fmt --check",
+    "check": "deno check src/mod.ts main.ts",
+    "doc": "deno doc --html --name='Claude Browser Control' --output=docs src/mod.ts"
   },
-  "imports": {},
+  "imports": {
+    "@std/path": "jsr:@std/path@^1"
+  },
   "compilerOptions": {
     "strict": true
+  },
+  "lint": {
+    "rules": {
+      "tags": ["recommended"],
+      "include": ["no-unused-vars", "no-explicit-any", "explicit-function-return-type"]
+    },
+    "exclude": ["coverage/", "docs/"]
+  },
+  "fmt": {
+    "useTabs": false,
+    "lineWidth": 100,
+    "indentWidth": 2,
+    "semiColons": true,
+    "singleQuote": false,
+    "proseWrap": "preserve",
+    "exclude": ["coverage/", "docs/"]
   }
 }
