@@ -5,6 +5,7 @@
 
 import type { LaunchOptions, LaunchedBrowser } from "./types.ts";
 import { DEFAULT_DEBUGGING_PORT } from "./types.ts";
+import { getVersion } from "../cdp/mod.ts";
 
 /**
  * Builds the command line arguments for launching the browser
@@ -49,14 +50,11 @@ async function waitForBrowser(
   maxAttempts = 30,
   delayMs = 100
 ): Promise<string> {
-  const endpoint = `http://127.0.0.1:${port}/json/version`;
-
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     try {
-      const response = await fetch(endpoint);
-      if (response.ok) {
-        const data = await response.json();
-        return data.webSocketDebuggerUrl;
+      const version = await getVersion({ port });
+      if (version.webSocketDebuggerUrl) {
+        return version.webSocketDebuggerUrl;
       }
     } catch {
       // Browser not ready yet
