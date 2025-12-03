@@ -39,7 +39,7 @@ targetRoutes.head("/:browser/:profile/:target", async (c) => {
   return c.body(null, 204);
 });
 
-/** Get target info */
+/** Get target info or upgrade to WebSocket */
 targetRoutes.get("/:browser/:profile/:target", async (c) => {
   const result = await getTarget(
     c.req.param("browser"),
@@ -49,6 +49,30 @@ targetRoutes.get("/:browser/:profile/:target", async (c) => {
 
   if ("error" in result) {
     return c.json({ error: result.error }, result.status);
+  }
+
+  // Check for WebSocket upgrade
+  const upgradeHeader = c.req.header("upgrade");
+  if (upgradeHeader?.toLowerCase() === "websocket") {
+    const wsUrl = result.target.webSocketDebuggerUrl;
+    if (!wsUrl) {
+      return c.json({ error: "Target has no WebSocket URL" }, 400);
+    }
+
+    const { socket: clientWs, response } = Deno.upgradeWebSocket(c.req.raw);
+    const browserWs = new WebSocket(wsUrl);
+
+    browserWs.onopen = () => {
+      clientWs.onmessage = (e) => browserWs.send(e.data);
+      browserWs.onmessage = (e) => clientWs.send(e.data);
+    };
+
+    clientWs.onclose = () => browserWs.close();
+    browserWs.onclose = () => clientWs.close();
+    browserWs.onerror = () => clientWs.close();
+    clientWs.onerror = () => browserWs.close();
+
+    return response;
   }
 
   return c.json({
