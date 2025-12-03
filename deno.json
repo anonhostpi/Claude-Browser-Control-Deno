@@ -1,0 +1,13 @@
+{
+  "name": "@anonhostpi/claude-browser-control-deno",
+  "version": "0.1.0",
+  "exports": "./main.ts",
+  "tasks": {
+    "dev": "deno run --watch main.ts",
+    "start": "deno run main.ts"
+  },
+  "imports": {},
+  "compilerOptions": {
+    "strict": true
+  }
+}
