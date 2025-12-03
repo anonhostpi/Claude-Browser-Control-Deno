@@ -58,3 +58,50 @@ targetRoutes.get("/:browser/:profile/:target", async (c) => {
     url: result.target.url,
   });
 });
+
+/** Navigate target to URL */
+targetRoutes.put("/:browser/:profile/:target", async (c) => {
+  const result = await getTarget(
+    c.req.param("browser"),
+    c.req.param("profile"),
+    c.req.param("target")
+  );
+
+  if ("error" in result) {
+    return c.json({ error: result.error }, result.status);
+  }
+
+  const body = await c.req.json();
+  if (!body.url) {
+    return c.json({ error: "url required" }, 400);
+  }
+
+  const client = await connect({
+    port: result.instance.launched.debuggingPort,
+    target: result.target.id,
+  });
+
+  await client.Page.navigate({ url: body.url });
+  await client.close();
+
+  return c.json({ url: body.url });
+});
+
+/** Close target */
+targetRoutes.delete("/:browser/:profile/:target", async (c) => {
+  const result = await getTarget(
+    c.req.param("browser"),
+    c.req.param("profile"),
+    c.req.param("target")
+  );
+
+  if ("error" in result) {
+    return c.json({ error: result.error }, result.status);
+  }
+
+  await closeTarget(result.target.id, {
+    port: result.instance.launched.debuggingPort,
+  });
+
+  return c.body(null, 204);
+});
