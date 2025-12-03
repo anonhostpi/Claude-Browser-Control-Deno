@@ -140,3 +140,46 @@ targetRoutes.post("/:browser/:profile/:target", async (c) => {
     await client.close();
   }
 });
+
+/** Inject script or modify target */
+targetRoutes.patch("/:browser/:profile/:target", async (c) => {
+  const result = await getTarget(
+    c.req.param("browser"),
+    c.req.param("profile"),
+    c.req.param("target")
+  );
+
+  if ("error" in result) {
+    return c.json({ error: result.error }, result.status);
+  }
+
+  const body = await c.req.json();
+
+  const client = await connect({
+    port: result.instance.launched.debuggingPort,
+    target: result.target.id,
+  });
+
+  try {
+    // Execute script if provided
+    if (body.script) {
+      const evalResult = await client.Runtime.evaluate({
+        expression: body.script,
+        returnByValue: true,
+      });
+      return c.json({ result: evalResult.result });
+    }
+
+    // Activate target if requested
+    if (body.activate) {
+      await activateTarget(result.target.id, {
+        port: result.instance.launched.debuggingPort,
+      });
+      return c.json({ activated: true });
+    }
+
+    return c.json({ error: "No action specified" }, 400);
+  } finally {
+    await client.close();
+  }
+});
