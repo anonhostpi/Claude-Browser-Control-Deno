@@ -1,0 +1,81 @@
+/**
+ * Tests for Browser Discovery Module
+ */
+
+import { assertEquals, assertExists } from "@std/assert";
+import {
+  discoverBrowsers,
+  getDefaultBrowser,
+  getBrowser,
+  BROWSER_CONFIGS,
+} from "../src/browsers/mod.ts";
+
+Deno.test("BROWSER_CONFIGS has expected browsers", () => {
+  const browserTypes = BROWSER_CONFIGS.map((c) => c.type);
+
+  assertEquals(browserTypes.includes("chrome"), true);
+  assertEquals(browserTypes.includes("edge"), true);
+  assertEquals(browserTypes.includes("brave"), true);
+  assertEquals(browserTypes.includes("chromium"), true);
+  assertEquals(browserTypes.includes("vivaldi"), true);
+});
+
+Deno.test("BROWSER_CONFIGS have paths for all platforms", () => {
+  for (const config of BROWSER_CONFIGS) {
+    assertExists(config.paths.windows);
+    assertExists(config.paths.darwin);
+    assertExists(config.paths.linux);
+
+    // Each platform should have executables and userDataDir
+    assertExists(config.paths.windows.executables);
+    assertExists(config.paths.windows.userDataDir);
+    assertExists(config.paths.darwin.executables);
+    assertExists(config.paths.darwin.userDataDir);
+    assertExists(config.paths.linux.executables);
+    assertExists(config.paths.linux.userDataDir);
+  }
+});
+
+Deno.test("discoverBrowsers returns an array", async () => {
+  const browsers = await discoverBrowsers();
+
+  assertEquals(Array.isArray(browsers), true);
+});
+
+Deno.test("discovered browsers have required properties", async () => {
+  const browsers = await discoverBrowsers();
+
+  for (const browser of browsers) {
+    assertExists(browser.type);
+    assertExists(browser.name);
+    assertExists(browser.executablePath);
+    assertExists(browser.userDataDir);
+    assertEquals(browser.isInstalled, true);
+  }
+});
+
+Deno.test("getDefaultBrowser returns a browser or null", async () => {
+  const browser = await getDefaultBrowser();
+
+  // May be null if no browsers installed, but if present should be valid
+  if (browser) {
+    assertExists(browser.type);
+    assertExists(browser.name);
+    assertExists(browser.executablePath);
+  }
+});
+
+Deno.test("getBrowser returns null for unknown browser type", async () => {
+  const browser = await getBrowser("nonexistent-browser");
+  assertEquals(browser, null);
+});
+
+Deno.test("getBrowser returns browser for valid types", async () => {
+  // Test with chrome - may or may not be installed
+  const chrome = await getBrowser("chrome");
+
+  if (chrome) {
+    assertEquals(chrome.type, "chrome");
+    assertEquals(chrome.name, "Google Chrome");
+  }
+});
