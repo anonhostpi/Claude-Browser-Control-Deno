@@ -24,3 +24,37 @@ async function getTarget(
 
   return { instance, target };
 }
+
+/** Check if target exists */
+targetRoutes.head("/:browser/:profile/:target", async (c) => {
+  const result = await getTarget(
+    c.req.param("browser"),
+    c.req.param("profile"),
+    c.req.param("target")
+  );
+
+  if ("error" in result) {
+    return c.body(null, result.status);
+  }
+  return c.body(null, 204);
+});
+
+/** Get target info */
+targetRoutes.get("/:browser/:profile/:target", async (c) => {
+  const result = await getTarget(
+    c.req.param("browser"),
+    c.req.param("profile"),
+    c.req.param("target")
+  );
+
+  if ("error" in result) {
+    return c.json({ error: result.error }, result.status);
+  }
+
+  return c.json({
+    id: result.target.id,
+    type: result.target.type,
+    title: result.target.title,
+    url: result.target.url,
+  });
+});
