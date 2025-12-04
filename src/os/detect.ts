@@ -6,63 +6,86 @@
 export type Platform = "windows" | "darwin" | "linux";
 export type DenoOS = typeof Deno.build.os;
 
+export class OS {
+  static #instance: OS | null = null;
+
+  static get instance(): OS {
+    return this.#instance ??= new OS();
+  }
+
+  readonly platform: Platform;
+  readonly home: string;
+  readonly localAppData?: string;
+
+  private constructor() {
+    this.platform = this.#mapPlatform(Deno.build.os);
+    this.home = this.#getHome();
+    this.localAppData = this.isWindows ? Deno.env.get("LOCALAPPDATA") : undefined;
+  }
+
+  #mapPlatform(os: DenoOS): Platform {
+    if (os === "windows") return "windows";
+    if (os === "darwin") return "darwin";
+    return "linux";
+  }
+
+  #getHome(): string {
+    const home = Deno.env.get("HOME") ?? Deno.env.get("USERPROFILE");
+    if (!home) {
+      throw new Error("Could not determine home directory");
+    }
+    return home;
+  }
+
+  get isWindows(): boolean {
+    return this.platform === "windows";
+  }
+
+  get isMac(): boolean {
+    return this.platform === "darwin";
+  }
+
+  get isLinux(): boolean {
+    return this.platform === "linux";
+  }
+
+  get separator(): string {
+    return this.isWindows ? "\\" : "/";
+  }
+
+  join(...segments: string[]): string {
+    return segments.join(this.separator);
+  }
+}
+
 export interface OSInfo {
   platform: Platform;
   homeDir: string;
-  localAppData?: string; // Windows-specific
+  localAppData?: string;
   isWindows: boolean;
   isMac: boolean;
   isLinux: boolean;
 }
 
-/**
- * Maps Deno's OS to our supported platform types
- * Unsupported Unix-like OSes are mapped to "linux"
- */
-function mapPlatform(os: DenoOS): Platform {
-  if (os === "windows") return "windows";
-  if (os === "darwin") return "darwin";
-  return "linux"; // FreeBSD, NetBSD, etc. use Linux-like paths
-}
-
-/**
- * Detects the current operating system and returns relevant info
- */
+/** @deprecated Use OS.instance instead */
 export function detectOS(): OSInfo {
-  const rawPlatform = Deno.build.os;
-  const platform = mapPlatform(rawPlatform);
-  const homeDir = getHomeDir();
-
-  const isWindows = platform === "windows";
-  const isMac = platform === "darwin";
-  const isLinux = platform === "linux";
-
+  const os = OS.instance;
   return {
-    platform,
-    homeDir,
-    localAppData: isWindows ? Deno.env.get("LOCALAPPDATA") : undefined,
-    isWindows,
-    isMac,
-    isLinux,
+    platform: os.platform,
+    homeDir: os.home,
+    localAppData: os.localAppData,
+    isWindows: os.isWindows,
+    isMac: os.isMac,
+    isLinux: os.isLinux,
   };
 }
 
-/**
- * Gets the user's home directory
- */
+/** @deprecated Use OS.instance.home instead */
 export function getHomeDir(): string {
-  const home = Deno.env.get("HOME") ?? Deno.env.get("USERPROFILE");
-  if (!home) {
-    throw new Error("Could not determine home directory");
-  }
-  return home;
+  return OS.instance.home;
 }
 
-/**
- * Joins path segments using the correct separator for the OS
- */
+/** @deprecated Use OS.instance.join() instead */
 export function joinPath(...segments: string[]): string {
-  const os = detectOS();
-  const sep = os.isWindows ? "\\" : "/";
-  return segments.join(sep);
+  return OS.instance.join(...segments);
 }
