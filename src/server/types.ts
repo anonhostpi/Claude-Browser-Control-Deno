@@ -11,7 +11,7 @@ export interface ServerConfig {
   port: number;
   hostname: string;
   /** Parent PID - server exits when parent dies (CLI-spawned mode) */
-  parentPid?: number;
+  pid?: number;
 }
 
 /** Key for instance registry */

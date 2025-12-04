@@ -1,96 +1,121 @@
 /**
- * Server Start
+ * Server
  * HTTP server with parent PID lifecycle management
  */
 
 import { create as routes } from "./routes/mod.ts";
+import { Hono } from "hono";
 import { registry } from "./registry.ts";
 import { DEFAULT_SERVER_PORT, DEFAULT_SERVER_HOSTNAME } from "./types.ts";
 import type { ServerConfig } from "./types.ts";
 
-/** Check if parent process is still alive */
-async function isParentAlive(pid: number): Promise<boolean> {
-  try {
-    // Cross-platform: try to signal process with 0 (doesn't kill, just checks)
-    if (Deno.build.os === "windows") {
-      const cmd = new Deno.Command("tasklist", {
-        args: ["/FI", `PID eq ${pid}`, "/NH"],
-        stdout: "piped",
-      });
-      const output = await cmd.output();
-      const text = new TextDecoder().decode(output.stdout);
-      return text.includes(pid.toString());
-    } else {
-      Deno.kill(pid, "SIGCONT");
-      return true;
-    }
-  } catch {
-    return false;
+export class Server {
+  static #instance: Server | null = null;
+
+  static create(config: Partial<ServerConfig> = {}): Server {
+    if (this.#instance)
+      throw new Error("Server instance is a singleton and already exists.");
+
+    return this.#instance = new Server(config);
   }
-}
 
-/** Start parent PID monitor */
-function startParentMonitor(parentPid: number, onOrphan: () => void): number {
-  return setInterval(async () => {
-    if (!(await isParentAlive(parentPid))) {
-      onOrphan();
-    }
-  }, 1000);
-}
+  static get instance(): Server {
+    if (!this.#instance)
+      throw new Error("Server instance is not created yet.");
 
-/** Cleanup all instances */
-async function cleanup(): Promise<void> {
-  const instances = registry.list();
-  for (const instance of instances) {
+    return this.#instance;
+  }
+
+  readonly port: number;
+  readonly hostname: string;
+  readonly parent?: number;
+
+  readonly #app: Hono;
+  readonly #controller: AbortController;
+  #monitorInterval?: number;
+
+  private constructor(config: Partial<ServerConfig> = {}) {
+    this.port = config.port ?? DEFAULT_SERVER_PORT;
+    this.hostname = config.hostname ?? DEFAULT_SERVER_HOSTNAME;
+    this.parent = config.pid;
+
+    this.#app = routes();
+    this.#controller = new AbortController();
+  }
+
+  /** Check if parent process is still alive */
+  async #keepalive(): Promise<boolean> {
+    const pid: number = this.parent!;
     try {
-      await instance.launched.close();
+      if (Deno.build.os === "windows") {
+        const cmd = new Deno.Command("tasklist", {
+          args: ["/FI", `PID eq ${pid}`, "/NH"],
+          stdout: "piped",
+        });
+        const output = await cmd.output();
+        const text = new TextDecoder().decode(output.stdout);
+        return text.includes(pid.toString());
+      } else {
+        Deno.kill(pid, "SIGCONT");
+        return true;
+      }
     } catch {
-      // Ignore errors during cleanup
+      return false;
     }
   }
-}
 
-export async function startServer(config: Partial<ServerConfig> = {}): Promise<void> {
-  const {
-    port = DEFAULT_SERVER_PORT,
-    hostname = DEFAULT_SERVER_HOSTNAME,
-    parentPid,
-  } = config;
+  /** Start parent PID monitor */
+  #monitor(): void {
+    if (!this.parent) return;
 
-  const app = routes();
-  const controller = new AbortController();
-
-  // Parent PID monitoring
-  let monitorInterval: number | undefined;
-  if (parentPid) {
-    console.log(`Monitoring parent PID: ${parentPid}`);
-    monitorInterval = startParentMonitor(parentPid, () => {
-      console.log("Parent process died, shutting down...");
-      controller.abort();
-    });
+    console.log(`Monitoring parent PID: ${this.parent}`);
+    this.#monitorInterval = setInterval(async () => {
+      if (!(await this.#keepalive())) {
+        console.log("Parent process died, shutting down...");
+        this.#controller.abort();
+      }
+    }, 1000);
   }
 
-  // Graceful shutdown
-  const shutdown = async () => {
+  /** Cleanup all browser instances */
+  async #cleanup(): Promise<void> {
+    const instances = registry.list();
+    for (const instance of instances) {
+      try {
+        await instance.launched.close();
+      } catch {
+        // Ignore errors during cleanup
+      }
+    }
+  }
+
+  /** Graceful shutdown */
+  async shutdown(): Promise<void> {
     console.log("\nShutting down server...");
-    if (monitorInterval) clearInterval(monitorInterval);
-    await cleanup();
-    controller.abort();
-  };
-
-  Deno.addSignalListener("SIGINT", shutdown);
-  if (Deno.build.os !== "windows") {
-    Deno.addSignalListener("SIGTERM", shutdown);
+    if (this.#monitorInterval) clearInterval(this.#monitorInterval);
+    await this.#cleanup();
+    this.#controller.abort();
   }
 
-  console.log(`Server starting on http://${hostname}:${port}`);
+  /** Start the server */
+  async start(): Promise<void> {
+    this.#monitor();
 
-  await Deno.serve({
-    port,
-    hostname,
-    signal: controller.signal,
-    onListen: () => {
-      console.log(`Server listening on http://${hostname}:${port}`);
-    },
-  }, app.fetch);
+    Deno.addSignalListener("SIGINT", () => this.shutdown());
+    if (Deno.build.os !== "windows") {
+      Deno.addSignalListener("SIGTERM", () => this.shutdown());
+    }
+
+    // TODO: JSON-ify all console.log calls
+    console.log(`Server starting on http://${this.hostname}:${this.port}`);
+
+    await Deno.serve({
+      port: this.port,
+      hostname: this.hostname,
+      signal: this.#controller.signal,
+      onListen: () => {
+        console.log(`Server listening on http://${this.hostname}:${this.port}`);
+      },
+    }, this.#app.fetch);
+  }
 }

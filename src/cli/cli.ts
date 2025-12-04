@@ -1,4 +1,4 @@
-import { startServer } from "../server/mod.ts";
+import { Server } from "../server/mod.ts";
 import { Controller } from "./spawn.ts";
 
 type Primitive = string | number | boolean | null | undefined;
@@ -133,10 +133,10 @@ export class CLI implements ICLI {
     const port = this.flags.port
       ? parseInt(this.flags.port)
       : undefined;
-    const parentPid = this.flags["parent-pid"]
+    const pid = this.flags["parent-pid"]
       ? parseInt(this.flags["parent-pid"])
       : undefined;
-    await startServer({ port, parentPid });
+    await Server.create({ port, pid }).start();
   }
 
   // TODO: rename all instances of "Claude" to "Agent"
