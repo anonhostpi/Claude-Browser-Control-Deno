@@ -28,6 +28,14 @@ export class CLI {
     this.client = new Client({ port: options.port });
   }
 
+  /** Get initialized client or throw */
+  private getClient(): Client {
+    if (!this.client) {
+      throw new Error("CLI not initialized. Call init() first.");
+    }
+    return this.client;
+  }
+
   /** Parse command line arguments */
   static parseArgs(args: string[]): { command: string; options: CLIOptions } {
     const command = args[0] ?? "";
