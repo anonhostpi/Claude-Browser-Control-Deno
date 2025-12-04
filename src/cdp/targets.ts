@@ -20,6 +20,15 @@ export class Targets {
     const { host = DEFAULT_HOST, port = DEFAULT_PORT } = options;
     return await CDP.List({ host, port }) as CDPTarget[];
   }
+
+  /** Create a new target (tab) */
+  static async create(
+    url: string = "about:blank",
+    options: TargetOptions = {}
+  ): Promise<CDPTarget> {
+    const { host = DEFAULT_HOST, port = DEFAULT_PORT } = options;
+    return await CDP.New({ host, port, url }) as CDPTarget;
+  }
 }
 
 /** @deprecated Use Targets.list */
