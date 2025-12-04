@@ -8,6 +8,30 @@ import type { BrowserInfo } from "../browsers/mod.ts";
 import type { ProfileInfo, ProfilePreferences } from "./types.ts";
 import { CLAUDE_PROFILE_NAME } from "./types.ts";
 
+export class Profiles {
+  /** Read the Preferences file from a profile directory */
+  static async readPreferences(profilePath: string): Promise<ProfilePreferences | null> {
+    try {
+      const prefsPath = join(profilePath, "Preferences");
+      const content = await Deno.readTextFile(prefsPath);
+      return JSON.parse(content);
+    } catch {
+      return null;
+    }
+  }
+
+  /** Check if a directory is a valid Chrome profile */
+  static async isValid(path: string): Promise<boolean> {
+    try {
+      const prefsPath = join(path, "Preferences");
+      const stat = await Deno.stat(prefsPath);
+      return stat.isFile;
+    } catch {
+      return false;
+    }
+  }
+}
+
 /**
  * Reads the Preferences file from a profile directory
  */
