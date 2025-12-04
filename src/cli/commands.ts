@@ -19,6 +19,14 @@ export interface CLIOptions {
 
 export class CLI {
   private client: Client | null = null;
+  private options: CLIOptions = {};
+
+  /** Initialize CLI with options */
+  async init(options: CLIOptions): Promise<void> {
+    this.options = options;
+    await ensureServer({ port: options.port });
+    this.client = new Client({ port: options.port });
+  }
 
   /** Parse command line arguments */
   static parseArgs(args: string[]): { command: string; options: CLIOptions } {
