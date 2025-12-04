@@ -91,7 +91,7 @@ export class Client {
   /** Navigate target */
   async navigate(browser: string, profile: string, target: string, url: string): Promise<unknown> {
     const res = await fetch(`${this.baseUrl}/${browser}/${profile}/${target}/`, {
-      method: "PUT",
+      method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ url }),
     });
