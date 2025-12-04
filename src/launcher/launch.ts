@@ -40,6 +40,29 @@ export class Launcher {
 
     return args;
   }
+
+  /** Check if a port is available */
+  static isPortAvailable(port: number): boolean {
+    try {
+      const listener = Deno.listen({ port });
+      listener.close();
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /** Find an available port starting from given port */
+  static findPort(startPort: number): number {
+    let port = startPort;
+    while (!this.isPortAvailable(port)) {
+      port++;
+      if (port > startPort + 100) {
+        throw new Error(`Could not find available port near ${startPort}`);
+      }
+    }
+    return port;
+  }
 }
 
 /** @deprecated Use Launcher.buildArgs */
