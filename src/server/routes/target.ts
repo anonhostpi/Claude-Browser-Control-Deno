@@ -83,34 +83,6 @@ targetRoutes.get("/:browser/:profile/:target", async (c) => {
   });
 });
 
-/** Navigate target to URL */
-targetRoutes.put("/:browser/:profile/:target", async (c) => {
-  const result = await getTarget(
-    c.req.param("browser"),
-    c.req.param("profile"),
-    c.req.param("target")
-  );
-
-  if ("error" in result) {
-    return c.json({ error: result.error }, result.status);
-  }
-
-  const body = await c.req.json();
-  if (!body.url) {
-    return c.json({ error: "url required" }, 400);
-  }
-
-  const client = await connect({
-    port: result.instance.launched.debuggingPort,
-    target: result.target.id,
-  });
-
-  await client.Page.navigate({ url: body.url });
-  await client.close();
-
-  return c.json({ url: body.url });
-});
-
 /** Close target */
 targetRoutes.delete("/:browser/:profile/:target", async (c) => {
   const result = await getTarget(
@@ -165,7 +137,7 @@ targetRoutes.post("/:browser/:profile/:target", async (c) => {
   }
 });
 
-/** Inject script or modify target */
+/** Update target (navigate, inject, activate) */
 targetRoutes.patch("/:browser/:profile/:target", async (c) => {
   const result = await getTarget(
     c.req.param("browser"),
@@ -185,6 +157,12 @@ targetRoutes.patch("/:browser/:profile/:target", async (c) => {
   });
 
   try {
+    // Navigate if URL provided
+    if (body.url) {
+      await client.Page.navigate({ url: body.url });
+      return c.json({ url: body.url });
+    }
+
     // Execute script if provided
     if (body.script) {
       const evalResult = await client.Runtime.evaluate({
