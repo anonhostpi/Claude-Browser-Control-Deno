@@ -30,6 +30,48 @@ export class Profiles {
       return false;
     }
   }
+
+  /** Discover all profiles for a given browser */
+  static async discover(browser: BrowserInfo): Promise<ProfileInfo[]> {
+    const profiles: ProfileInfo[] = [];
+    const userDataDir = browser.userDataDir;
+
+    try {
+      for await (const entry of Deno.readDir(userDataDir)) {
+        if (!entry.isDirectory) continue;
+
+        const isProfileDir =
+          entry.name === "Default" ||
+          entry.name.startsWith("Profile ") ||
+          entry.name === CLAUDE_PROFILE_NAME;
+
+        const profilePath = join(userDataDir, entry.name);
+
+        if (isProfileDir || (await this.isValid(profilePath))) {
+          const prefs = await this.readPreferences(profilePath);
+
+          profiles.push({
+            name: entry.name,
+            path: profilePath,
+            displayName: prefs?.profile?.name ?? entry.name,
+            isDefault: entry.name === "Default",
+          });
+        }
+      }
+    } catch (error) {
+      console.error(`Error reading profiles from ${userDataDir}:`, error);
+    }
+
+    return profiles;
+  }
+
+  /** Find a specific profile by name */
+  static async find(browser: BrowserInfo, profileName: string): Promise<ProfileInfo | null> {
+    const profiles = await this.discover(browser);
+    return (
+      profiles.find((p) => p.name === profileName || p.displayName === profileName) ?? null
+    );
+  }
 }
 
 /**
