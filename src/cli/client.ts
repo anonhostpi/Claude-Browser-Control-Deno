@@ -190,4 +190,20 @@ export class Client {
     );
     return res.json();
   }
+
+  /** Interact with node (click, type, setAttribute) */
+  async interactNode(
+    browser: string,
+    profile: string,
+    target: string,
+    nodeId: string,
+    action: { click?: boolean; type?: string; setAttribute?: { name: string; value: string } }
+  ): Promise<unknown> {
+    const res = await fetch(`${this.baseUrl}/${browser}/${profile}/${target}/${nodeId}/`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(action),
+    });
+    return res.json();
+  }
 }
