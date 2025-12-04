@@ -44,6 +44,11 @@ export class CLI {
     });
   }
 
+  /** List available browsers */
+  list(): Promise<unknown> {
+    return this.getClient().listBrowsers();
+  }
+
   /** Parse command line arguments */
   static parseArgs(args: string[]): { command: string; options: CLIOptions } {
     const command = args[0] ?? "";
