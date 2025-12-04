@@ -3,7 +3,7 @@
  * HTTP server with parent PID lifecycle management
  */
 
-import { createApp } from "./app.ts";
+import { create as routes } from "./routes/mod.ts";
 import { registry } from "./registry.ts";
 import { DEFAULT_SERVER_PORT, DEFAULT_SERVER_HOSTNAME } from "./types.ts";
 import type { ServerConfig } from "./types.ts";
@@ -57,7 +57,7 @@ export async function startServer(config: Partial<ServerConfig> = {}): Promise<v
     parentPid,
   } = config;
 
-  const app = createApp();
+  const app = routes();
   const controller = new AbortController();
 
   // Parent PID monitoring

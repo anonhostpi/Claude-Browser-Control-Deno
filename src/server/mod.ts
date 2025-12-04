@@ -4,5 +4,5 @@
 
 export * from "./types.ts";
 export { registry } from "./registry.ts";
-export { createApp } from "./app.ts";
+export { create as routes } from "./routes/mod.ts";
 export { startServer } from "./serve.ts";
