@@ -7,39 +7,45 @@ import type { LaunchOptions, LaunchedBrowser } from "./types.ts";
 import { DEFAULT_DEBUGGING_PORT } from "./types.ts";
 import { getVersion } from "../cdp/mod.ts";
 
-/**
- * Builds the command line arguments for launching the browser
- */
+export class Launcher {
+  /** Build command line arguments for browser launch */
+  static buildArgs(options: LaunchOptions & { debuggingPort: number }): string[] {
+    const {
+      profile,
+      debuggingPort,
+      startUrl,
+      headless = false,
+      extraArgs = [],
+      windowWidth = 1280,
+      windowHeight = 800,
+    } = options;
+
+    const args: string[] = [
+      `--remote-debugging-port=${debuggingPort}`,
+      `--user-data-dir=${profile.path}`,
+      `--window-size=${windowWidth},${windowHeight}`,
+      "--no-first-run",
+      "--no-default-browser-check",
+    ];
+
+    if (headless) {
+      args.push("--headless=new");
+    }
+
+    args.push(...extraArgs);
+
+    if (startUrl) {
+      args.push(startUrl);
+    }
+
+    return args;
+  }
+}
+
+/** @deprecated Use Launcher.buildArgs */
 function buildLaunchArgs(options: LaunchOptions): string[] {
-  const {
-    profile,
-    debuggingPort = DEFAULT_DEBUGGING_PORT,
-    startUrl,
-    headless = false,
-    extraArgs = [],
-    windowWidth = 1280,
-    windowHeight = 800,
-  } = options;
-
-  const args: string[] = [
-    `--remote-debugging-port=${debuggingPort}`,
-    `--user-data-dir=${profile.path}`,
-    `--window-size=${windowWidth},${windowHeight}`,
-    "--no-first-run",
-    "--no-default-browser-check",
-  ];
-
-  if (headless) {
-    args.push("--headless=new");
-  }
-
-  args.push(...extraArgs);
-
-  if (startUrl) {
-    args.push(startUrl);
-  }
-
-  return args;
+  const debuggingPort = options.debuggingPort ?? DEFAULT_DEBUGGING_PORT;
+  return Launcher.buildArgs({ ...options, debuggingPort });
 }
 
 /**
