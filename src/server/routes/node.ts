@@ -95,3 +95,59 @@ nodeRoutes.get("/:browser/:profile/:target/:node", async (c) => {
     await client.close();
   }
 });
+
+/** Interact with node (click, type, setAttribute) */
+nodeRoutes.patch("/:browser/:profile/:target/:node", async (c) => {
+  const result = await getNode(
+    c.req.param("browser"),
+    c.req.param("profile"),
+    c.req.param("target"),
+    c.req.param("node")
+  );
+
+  if ("error" in result) {
+    return c.json({ error: result.error }, result.status);
+  }
+
+  const body = await c.req.json();
+
+  const client = await connect({
+    port: result.instance.launched.debuggingPort,
+    target: result.targetId,
+  });
+
+  try {
+    // Click the node
+    if (body.click) {
+      const { model } = await client.DOM.getBoxModel({ nodeId: result.nodeId });
+      const x = (model.content[0] + model.content[2]) / 2;
+      const y = (model.content[1] + model.content[5]) / 2;
+      await client.Input.dispatchMouseEvent({ type: "mousePressed", x, y, button: "left", clickCount: 1 });
+      await client.Input.dispatchMouseEvent({ type: "mouseReleased", x, y, button: "left", clickCount: 1 });
+      return c.json({ clicked: true });
+    }
+
+    // Type into the node
+    if (body.type) {
+      await client.DOM.focus({ nodeId: result.nodeId });
+      await client.Input.insertText({ text: body.type });
+      return c.json({ typed: body.type });
+    }
+
+    // Set attribute
+    if (body.setAttribute) {
+      await client.DOM.setAttributeValue({
+        nodeId: result.nodeId,
+        name: body.setAttribute.name,
+        value: body.setAttribute.value,
+      });
+      return c.json({ setAttribute: body.setAttribute });
+    }
+
+    return c.json({ error: "No action specified" }, 400);
+  } catch (e) {
+    return c.json({ error: String(e) }, 500);
+  } finally {
+    await client.close();
+  }
+});
