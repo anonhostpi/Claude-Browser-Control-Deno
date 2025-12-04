@@ -3,4 +3,4 @@
  */
 
 export { Client } from "./client.ts";
-export { ensureServer } from "./spawn.ts";
+export { Controller } from "./spawn.ts";

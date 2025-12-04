@@ -11,62 +11,74 @@ export interface SpawnOptions {
   timeout?: number;
 }
 
-/** Spawn the server as a child process */
-async function spawnServer(port: number, parentPid: number): Promise<Deno.ChildProcess> {
-  const cmd = new Deno.Command(Deno.execPath(), {
-    args: [
-      "run",
-      "--allow-read",
-      "--allow-write",
-      "--allow-env",
-      "--allow-net",
-      "--allow-run",
-      "main.ts",
-      "serve",
-      `--port=${port}`,
-      `--parent-pid=${parentPid}`,
-    ],
-    stdout: "inherit",
-    stderr: "inherit",
-    stdin: "null",
-  });
+export class Controller {
+  static #instance: Controller | null = null;
+  static create(directory: string): Controller {
+    if (this.#instance)
+      throw new Error("Controller instance is a singleton and already exists.");
 
-  return cmd.spawn();
-}
+    return this.#instance ??= new Controller(directory);
+  }
+  static get instance(): Controller {
+    if (!this.#instance)
+      throw new Error("Controller instance is not created yet.");
 
-/** Wait for server to be ready */
-async function waitForServer(client: Client, timeout: number): Promise<boolean> {
-  const start = Date.now();
-  while (Date.now() - start < timeout) {
-    if (await client.isAlive()) {
-      return true;
+    return this.#instance;
+  }
+  private constructor(directory: string) {
+    this.directory = directory;
+  }
+  readonly directory: string;
+  spawn(
+    { port = DEFAULT_SERVER_PORT }: SpawnOptions,
+    pid: number = Deno.pid,
+  ): Deno.ChildProcess {
+    const project_dir = this.directory;
+    const cmd = new Deno.Command(Deno.execPath(), {
+      args: [
+        "run",
+        "--allow-read",
+        "--allow-write",
+        "--allow-env",
+        "--allow-net",
+        "--allow-run",
+        `${project_dir}/main.ts`,
+        "serve",
+        `--port=${port}`,
+        `--parent-pid=${pid}`,
+      ],
+      stdout: "inherit",
+      stderr: "inherit",
+      stdin: "null",
+    });
+
+    return cmd.spawn();
+  }
+  async await(client: Client, timeout: number): Promise<boolean> {
+    const start = Date.now();
+    while (Date.now() - start < timeout) {
+      if (await client.isAlive())
+        return true;
+      await new Promise((r) => setTimeout(r, 100));
     }
-    await new Promise((r) => setTimeout(r, 100));
+    return false;
   }
-  return false;
-}
+  async ensure(
+    { port = DEFAULT_SERVER_PORT, timeout = 5000 }: SpawnOptions = {}
+  ): Promise<{
+    client: Client;
+    process?: Deno.ChildProcess;
+  }> {
+    const client = new Client({ port });
+    if (await client.isAlive())
+      return { client };
 
-/** Ensure server is running, returns client and whether we spawned it */
-export async function ensureServer(
-  options: SpawnOptions = {}
-): Promise<{ client: Client; spawned: boolean; process?: Deno.ChildProcess }> {
-  const { port = DEFAULT_SERVER_PORT, timeout = 5000 } = options;
-  const client = new Client({ port });
-
-  // Check if already running
-  if (await client.isAlive()) {
-    return { client, spawned: false };
+    const process = this.spawn({ port });
+    const ready = await this.await(client, timeout);
+    if (!ready) {
+      process.kill();
+      throw new Error("Server failed to start within timeout");
+    }
+    return { client, process };
   }
-
-  // Spawn server
-  const process = await spawnServer(port, Deno.pid);
-
-  // Wait for it to be ready
-  const ready = await waitForServer(client, timeout);
-  if (!ready) {
-    process.kill();
-    throw new Error("Server failed to start within timeout");
-  }
-
-  return { client, spawned: true, process };
 }

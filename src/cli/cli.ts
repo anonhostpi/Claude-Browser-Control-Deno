@@ -1,5 +1,5 @@
 import { startServer } from "../server/mod.ts";
-import { ensureServer } from "./mod.ts";
+import { Controller } from "./spawn.ts";
 
 type Primitive = string | number | boolean | null | undefined;
 
@@ -55,6 +55,8 @@ export class CLI implements ICLI {
     this.usage = usage;
 
     this.flags = this.parse(this.args);
+
+    this.#controller = Controller.create(location);
   }
 
   readonly location: string;
@@ -86,6 +88,7 @@ export class CLI implements ICLI {
 
     throw new Error(`Unknown command: ${this.command}. Use --help for usage.`);
   }
+  #controller: Controller;
 
   async main(): Promise<void> {
     try {
@@ -151,7 +154,7 @@ export class CLI implements ICLI {
     return { browser, profile, target, url };
   }
   async info(): Promise<void> {
-    const { client } = await ensureServer();
+    const { client } = await this.#controller.ensure();
     const data = await client.listBrowsers() as {
       browsers: Array<{ type: string; name: string }>
     };
@@ -179,7 +182,7 @@ export class CLI implements ICLI {
     const { browser, profile } = this.#subject();
     const headless = "headless" in flags;
 
-    const { client } = await ensureServer();
+    const { client } = await this.#controller.ensure();
     const result = await client.launchInstance(
       browser, profile, { headless }
     );
@@ -188,14 +191,14 @@ export class CLI implements ICLI {
   // TODO: add a target close method as well
   async close(): Promise<boolean> {
     const { browser, profile } = this.#subject();
-    const { client } = await ensureServer();
+    const { client } = await this.#controller.ensure();
     // TODO: make sure this throws if applicable
     await client.closeInstance(browser, profile);
     return true;
   }
   async targets(): Promise<void> {
     const { browser, profile } = this.#subject();
-    const { client } = await ensureServer();
+    const { client } = await this.#controller.ensure();
     const result = await client.getInstance(
       browser, profile
     ) as {
@@ -218,7 +221,7 @@ export class CLI implements ICLI {
       throw new Error("--url required");
     }
 
-    const { client } = await ensureServer();
+    const { client } = await this.#controller.ensure();
     await client.navigate(browser, profile, target, url);
     console.log(`Navigated to ${url}`);
   }
