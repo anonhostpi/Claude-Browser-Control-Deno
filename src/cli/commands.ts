@@ -67,6 +67,15 @@ export class CLI {
     return this.getClient().closeInstance(browser, profile);
   }
 
+  /** Navigate target to URL */
+  navigate(): Promise<unknown> {
+    const { browser, profile, target, url } = this.options;
+    if (!browser || !profile || !target || !url) {
+      throw new Error("--browser, --profile, --target, and --url required");
+    }
+    return this.getClient().navigate(browser, profile, target, url);
+  }
+
   /** Parse command line arguments */
   static parseArgs(args: string[]): { command: string; options: CLIOptions } {
     const command = args[0] ?? "";
