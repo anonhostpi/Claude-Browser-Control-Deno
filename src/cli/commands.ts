@@ -76,6 +76,24 @@ export class CLI {
     return this.getClient().navigate(browser, profile, target, url);
   }
 
+  /** Run a command by name */
+  run(command: string): Promise<unknown> {
+    switch (command) {
+      case "serve":
+        return this.serve();
+      case "list":
+        return this.list();
+      case "launch":
+        return this.launch();
+      case "close":
+        return this.close();
+      case "navigate":
+        return this.navigate();
+      default:
+        throw new Error(`Unknown command: ${command}`);
+    }
+  }
+
   /** Parse command line arguments */
   static parseArgs(args: string[]): { command: string; options: CLIOptions } {
     const command = args[0] ?? "";
