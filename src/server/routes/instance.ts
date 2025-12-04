@@ -50,13 +50,34 @@ instanceRoutes.get("/:browser/:profile", async (c) => {
   });
 });
 
-/** Launch instance (idempotent) */
+/** Create instance or target based on body type */
 instanceRoutes.put("/:browser/:profile", async (c) => {
   const browserType = c.req.param("browser");
   const profileName = c.req.param("profile");
   const key = { browser: browserType, profile: profileName };
 
-  // Return existing if already running
+  const body = await c.req.json().catch(() => ({ type: "instance" }));
+
+  // Handle target creation
+  if (body.type === "target") {
+    const instance = registry.get(key);
+    if (!instance) {
+      return c.json({ error: "Instance not running" }, 404);
+    }
+
+    const target = await createTarget(body.url ?? "about:blank", {
+      port: instance.launched.debuggingPort,
+    });
+
+    return c.json({
+      id: target.id,
+      type: target.type,
+      title: target.title,
+      url: target.url,
+    }, 201);
+  }
+
+  // Handle instance creation (idempotent)
   const existing = registry.get(key);
   if (existing) {
     return c.json({
@@ -68,7 +89,6 @@ instanceRoutes.put("/:browser/:profile", async (c) => {
     });
   }
 
-  // Get browser and profile
   const browser = await getBrowser(browserType);
   if (!browser) {
     return c.json({ error: "Browser not found" }, 404);
@@ -76,19 +96,11 @@ instanceRoutes.put("/:browser/:profile", async (c) => {
 
   const profile = await getProfile(browser, profileName);
 
-  // Parse query params
-  const url = new URL(c.req.url);
-  const headless = url.searchParams.get("headless") === "true";
-  const port = url.searchParams.has("port")
-    ? parseInt(url.searchParams.get("port")!)
-    : undefined;
-
-  // Launch
   const launched = await launchBrowser({
     browser,
     profile,
-    headless,
-    debuggingPort: port,
+    headless: body.headless ?? false,
+    debuggingPort: body.port,
   });
 
   registry.set({
@@ -123,29 +135,4 @@ instanceRoutes.delete("/:browser/:profile", async (c) => {
   registry.delete(key);
 
   return c.body(null, 204);
-});
-
-/** Create new target (tab) */
-instanceRoutes.post("/:browser/:profile", async (c) => {
-  const browser = c.req.param("browser");
-  const profile = c.req.param("profile");
-
-  const instance = registry.get({ browser, profile });
-  if (!instance) {
-    return c.json({ error: "Instance not running" }, 404);
-  }
-
-  const body = await c.req.json().catch(() => ({}));
-  const url = body.url ?? "about:blank";
-
-  const target = await createTarget(url, {
-    port: instance.launched.debuggingPort,
-  });
-
-  return c.json({
-    id: target.id,
-    type: target.type,
-    title: target.title,
-    url: target.url,
-  }, 201);
 });
