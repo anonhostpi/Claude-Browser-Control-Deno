@@ -34,6 +34,22 @@ export class Browsers {
       return false;
     }
   }
+
+  /** Get browser paths for the current platform */
+  static getPlatformPaths(config: BrowserConfig, platform: Platform): BrowserPaths {
+    return config.paths[platform];
+  }
+
+  /** Find the first existing executable from a list of possible paths */
+  static async findExecutable(paths: string[]): Promise<string | null> {
+    for (const path of paths) {
+      const resolved = this.resolvePath(path);
+      if (await this.fileExists(resolved)) {
+        return resolved;
+      }
+    }
+    return null;
+  }
 }
 
 /**
