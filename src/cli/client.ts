@@ -177,4 +177,17 @@ export class Client {
     const res = await fetch(`${this.baseUrl}/${browser}/${profile}/${target}/${nodeId}/`);
     return res.json();
   }
+
+  /** Get node children */
+  async getNodeChildren(
+    browser: string,
+    profile: string,
+    target: string,
+    nodeId: string
+  ): Promise<unknown> {
+    const res = await fetch(
+      `${this.baseUrl}/${browser}/${profile}/${target}/${nodeId}/?children`
+    );
+    return res.json();
+  }
 }
