@@ -50,6 +50,60 @@ export class Browsers {
     }
     return null;
   }
+
+  /** Discover a single browser installation */
+  static async #discoverOne(config: BrowserConfig): Promise<BrowserInfo | null> {
+    const os = OS.instance;
+    const paths = this.getPlatformPaths(config, os.platform);
+
+    const executablePath = await this.findExecutable(paths.executables);
+    if (!executablePath) {
+      return null;
+    }
+
+    const userDataDir = this.resolvePath(paths.userDataDir);
+
+    return {
+      type: config.type,
+      name: config.name,
+      executablePath,
+      userDataDir,
+      isInstalled: true,
+    };
+  }
+
+  /** Discover all installed Chrome-based browsers */
+  static async discover(): Promise<BrowserInfo[]> {
+    const browsers: BrowserInfo[] = [];
+    for (const config of BROWSER_CONFIGS) {
+      const browser = await this.#discoverOne(config);
+      if (browser) {
+        browsers.push(browser);
+      }
+    }
+    return browsers;
+  }
+
+  /** Get a specific browser by type if installed */
+  static async get(type: string): Promise<BrowserInfo | null> {
+    const config = BROWSER_CONFIGS.find((c) => c.type === type);
+    if (!config) {
+      return null;
+    }
+    return this.#discoverOne(config);
+  }
+
+  /** Get the first available browser (prefers Chrome > Edge > Brave > others) */
+  static async getDefault(): Promise<BrowserInfo | null> {
+    const preferredOrder = ["chrome", "edge", "brave", "chromium", "vivaldi"];
+    for (const type of preferredOrder) {
+      const browser = await this.get(type);
+      if (browser) {
+        return browser;
+      }
+    }
+    return null;
+  }
 }
 
 /**
