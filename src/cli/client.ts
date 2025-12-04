@@ -59,12 +59,11 @@ export class Client {
     profile: string,
     options: { headless?: boolean; port?: number } = {}
   ): Promise<unknown> {
-    const params = new URLSearchParams();
-    if (options.headless) params.set("headless", "true");
-    if (options.port) params.set("port", options.port.toString());
-
-    const url = `${this.baseUrl}/${browser}/${profile}/${params.toString() ? `?${params}` : ""}`;
-    const res = await fetch(url, { method: "PUT" });
+    const res = await fetch(`${this.baseUrl}/${browser}/${profile}/`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type: "instance", ...options }),
+    });
     return res.json();
   }
 
@@ -76,9 +75,9 @@ export class Client {
   /** Create target */
   async createTarget(browser: string, profile: string, url?: string): Promise<unknown> {
     const res = await fetch(`${this.baseUrl}/${browser}/${profile}/`, {
-      method: "POST",
+      method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url }),
+      body: JSON.stringify({ type: "target", url }),
     });
     return res.json();
   }
