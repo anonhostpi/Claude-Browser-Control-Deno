@@ -37,7 +37,15 @@ export class CLI implements ICLI {
   static create(
     location: string, version: string, usage: string
   ): CLI {
-    return CLI.#instance ??= new CLI(location, version, usage);
+    if (CLI.#instance)
+      throw new Error("CLI instance is a singleton and already exists.");
+
+    return CLI.#instance = new CLI(location, version, usage);
+  }
+  static get instance(): CLI {
+    if (!this.#instance)
+      throw new Error("CLI instance not created yet.");
+    return this.#instance;
   }
   private constructor(
     location: string, version: string, usage: string
