@@ -49,6 +49,15 @@ export class CLI {
     return this.getClient().listBrowsers();
   }
 
+  /** Launch browser instance */
+  launch(): Promise<unknown> {
+    const { browser, profile, headless } = this.options;
+    if (!browser || !profile) {
+      throw new Error("--browser and --profile required");
+    }
+    return this.getClient().launchInstance(browser, profile, { headless });
+  }
+
   /** Parse command line arguments */
   static parseArgs(args: string[]): { command: string; options: CLIOptions } {
     const command = args[0] ?? "";
