@@ -83,6 +83,48 @@ export class Launcher {
     }
     throw new Error(`Browser did not start within ${maxAttempts * delayMs}ms`);
   }
+
+  /** Launch a browser with CDP debugging enabled */
+  static async launch(options: LaunchOptions): Promise<LaunchedBrowser> {
+    const { browser, profile } = options;
+
+    const requestedPort = options.debuggingPort ?? DEFAULT_DEBUGGING_PORT;
+    const debuggingPort = this.findPort(requestedPort);
+    const args = this.buildArgs({ ...options, debuggingPort });
+
+    console.log(`Launching ${browser.name} with profile "${profile.displayName}"...`);
+    console.log(`Executable: ${browser.executablePath}`);
+    console.log(`Debugging port: ${debuggingPort}`);
+
+    const command = new Deno.Command(browser.executablePath, {
+      args,
+      stdout: "piped",
+      stderr: "piped",
+    });
+
+    const process = command.spawn();
+
+    let wsEndpoint: string;
+    try {
+      wsEndpoint = await this.awaitReady(debuggingPort);
+    } catch (error) {
+      process.kill();
+      throw error;
+    }
+
+    console.log(`Browser ready. WebSocket endpoint: ${wsEndpoint}`);
+
+    return {
+      process,
+      debuggingPort,
+      wsEndpoint,
+      browser,
+      profile,
+      close: async () => {
+        process.kill();
+      },
+    };
+  }
 }
 
 /** @deprecated Use Launcher.buildArgs */
