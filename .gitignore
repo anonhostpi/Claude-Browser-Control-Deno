@@ -6,6 +6,9 @@ deno.lock
 .vscode/
 .idea/
 
+# Claude Code (local settings only)
+.claude/settings.local.json
+
 # OS
 .DS_Store
 Thumbs.db
