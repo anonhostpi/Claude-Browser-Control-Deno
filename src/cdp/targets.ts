@@ -6,14 +6,27 @@
 import CDP from "chrome-remote-interface";
 import type { CDPTarget } from "./types.ts";
 
-/**
- * Lists all available targets
- */
-export async function listTargets(
-  options: { host?: string; port?: number } = {}
+export interface TargetOptions {
+  host?: string;
+  port?: number;
+}
+
+const DEFAULT_HOST = "127.0.0.1";
+const DEFAULT_PORT = 9222;
+
+export class Targets {
+  /** List all available targets */
+  static async list(options: TargetOptions = {}): Promise<CDPTarget[]> {
+    const { host = DEFAULT_HOST, port = DEFAULT_PORT } = options;
+    return await CDP.List({ host, port }) as CDPTarget[];
+  }
+}
+
+/** @deprecated Use Targets.list */
+export function listTargets(
+  options: TargetOptions = {}
 ): Promise<CDPTarget[]> {
-  const { host = "127.0.0.1", port = 9222 } = options;
-  return await CDP.List({ host, port }) as CDPTarget[];
+  return Targets.list(options);
 }
 
 /**
