@@ -63,6 +63,26 @@ export class Launcher {
     }
     return port;
   }
+
+  /** Wait for browser to be ready by polling CDP endpoint */
+  static async awaitReady(
+    port: number,
+    maxAttempts = 30,
+    delayMs = 100
+  ): Promise<string> {
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      try {
+        const version = await getVersion({ port });
+        if (version.webSocketDebuggerUrl) {
+          return version.webSocketDebuggerUrl;
+        }
+      } catch {
+        // Browser not ready yet
+      }
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+    throw new Error(`Browser did not start within ${maxAttempts * delayMs}ms`);
+  }
 }
 
 /** @deprecated Use Launcher.buildArgs */
