@@ -39,7 +39,7 @@ targetRoutes.head("/:browser/:profile/:target", async (c) => {
   return c.body(null, 204);
 });
 
-/** Get target info or upgrade to WebSocket */
+/** Get target info, query nodes, or upgrade to WebSocket */
 targetRoutes.get("/:browser/:profile/:target", async (c) => {
   const result = await getTarget(
     c.req.param("browser"),
@@ -73,6 +73,41 @@ targetRoutes.get("/:browser/:profile/:target", async (c) => {
     clientWs.onerror = () => browserWs.close();
 
     return response;
+  }
+
+  // Handle XPath query
+  const xpath = c.req.query("xpath");
+  if (xpath) {
+    const client = await connect({
+      port: result.instance.launched.debuggingPort,
+      target: result.target.id,
+    });
+
+    try {
+      const { root } = await client.DOM.getDocument();
+      const { nodeIds } = await client.DOM.performSearch({ query: xpath });
+      return c.json({ nodes: nodeIds });
+    } finally {
+      await client.close();
+    }
+  }
+
+  // Handle CSS selector query
+  const css = c.req.query("css");
+  if (css) {
+    const client = await connect({
+      port: result.instance.launched.debuggingPort,
+      target: result.target.id,
+    });
+
+    try {
+      const { root } = await client.DOM.getDocument();
+      const { nodeId } = await client.DOM.querySelector({ nodeId: root.nodeId, selector: css });
+      const { nodeIds } = await client.DOM.querySelectorAll({ nodeId: root.nodeId, selector: css });
+      return c.json({ nodes: nodeIds });
+    } finally {
+      await client.close();
+    }
   }
 
   return c.json({
