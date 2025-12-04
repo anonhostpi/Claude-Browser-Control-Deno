@@ -128,4 +128,28 @@ export class Client {
     });
     return res.json();
   }
+
+  /** Query nodes by XPath */
+  async queryXPath(
+    browser: string,
+    profile: string,
+    target: string,
+    xpath: string
+  ): Promise<unknown> {
+    const params = new URLSearchParams({ xpath });
+    const res = await fetch(`${this.baseUrl}/${browser}/${profile}/${target}/?${params}`);
+    return res.json();
+  }
+
+  /** Query nodes by CSS selector */
+  async queryCss(
+    browser: string,
+    profile: string,
+    target: string,
+    css: string
+  ): Promise<unknown> {
+    const params = new URLSearchParams({ css });
+    const res = await fetch(`${this.baseUrl}/${browser}/${profile}/${target}/?${params}`);
+    return res.json();
+  }
 }
