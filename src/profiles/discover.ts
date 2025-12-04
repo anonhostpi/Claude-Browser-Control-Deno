@@ -72,6 +72,45 @@ export class Profiles {
       profiles.find((p) => p.name === profileName || p.displayName === profileName) ?? null
     );
   }
+
+  /** Get or create the Claude profile directory */
+  static async getClaude(browser: BrowserInfo): Promise<ProfileInfo> {
+    const userDataDir = browser.userDataDir;
+    const claudeProfilePath = join(userDataDir, CLAUDE_PROFILE_NAME);
+
+    const existingProfile = await this.find(browser, CLAUDE_PROFILE_NAME);
+    if (existingProfile) {
+      return existingProfile;
+    }
+
+    try {
+      await Deno.mkdir(claudeProfilePath, { recursive: true });
+    } catch (error) {
+      if (!(error instanceof Deno.errors.AlreadyExists)) {
+        throw error;
+      }
+    }
+
+    return {
+      name: CLAUDE_PROFILE_NAME,
+      path: claudeProfilePath,
+      displayName: CLAUDE_PROFILE_NAME,
+      isDefault: false,
+    };
+  }
+
+  /** Get the appropriate profile - Claude profile by default, or specified profile */
+  static async get(browser: BrowserInfo, profileName?: string): Promise<ProfileInfo> {
+    if (profileName) {
+      const profile = await this.find(browser, profileName);
+      if (!profile) {
+        throw new Error(`Profile "${profileName}" not found for ${browser.name}`);
+      }
+      return profile;
+    }
+
+    return this.getClaude(browser);
+  }
 }
 
 /**
