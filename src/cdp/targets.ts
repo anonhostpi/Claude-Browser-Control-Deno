@@ -29,6 +29,18 @@ export class Targets {
     const { host = DEFAULT_HOST, port = DEFAULT_PORT } = options;
     return await CDP.New({ host, port, url }) as CDPTarget;
   }
+
+  /** Activate a target by ID */
+  static async activate(id: string, options: TargetOptions = {}): Promise<void> {
+    const { host = DEFAULT_HOST, port = DEFAULT_PORT } = options;
+    await CDP.Activate({ host, port, id });
+  }
+
+  /** Close a target by ID */
+  static async close(id: string, options: TargetOptions = {}): Promise<void> {
+    const { host = DEFAULT_HOST, port = DEFAULT_PORT } = options;
+    await CDP.Close({ host, port, id });
+  }
 }
 
 /** @deprecated Use Targets.list */
