@@ -50,35 +50,26 @@ export function listTargets(
   return Targets.list(options);
 }
 
-/**
- * Creates a new target (tab)
- */
-export async function createTarget(
+/** @deprecated Use Targets.create */
+export function createTarget(
   url: string = "about:blank",
-  options: { host?: string; port?: number } = {}
+  options: TargetOptions = {}
 ): Promise<CDPTarget> {
-  const { host = "127.0.0.1", port = 9222 } = options;
-  return await CDP.New({ host, port, url }) as CDPTarget;
+  return Targets.create(url, options);
 }
 
-/**
- * Activates a target by ID
- */
-export async function activateTarget(
+/** @deprecated Use Targets.activate */
+export function activateTarget(
   id: string,
-  options: { host?: string; port?: number } = {}
+  options: TargetOptions = {}
 ): Promise<void> {
-  const { host = "127.0.0.1", port = 9222 } = options;
-  await CDP.Activate({ host, port, id });
+  return Targets.activate(id, options);
 }
 
-/**
- * Closes a target by ID
- */
-export async function closeTarget(
+/** @deprecated Use Targets.close */
+export function closeTarget(
   id: string,
-  options: { host?: string; port?: number } = {}
+  options: TargetOptions = {}
 ): Promise<void> {
-  const { host = "127.0.0.1", port = 9222 } = options;
-  await CDP.Close({ host, port, id });
+  return Targets.close(id, options);
 }
