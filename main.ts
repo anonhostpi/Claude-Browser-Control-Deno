@@ -10,9 +10,10 @@ if (!import.meta.main)
   throw new Error("main.ts should be run as a command.");
 
 // get version from ./deno.json:
+const LOCATION = import.meta.dirname;
 const VERSION = await (async () => {
   const metadata = await Deno.readTextFile(
-    `${import.meta.dirname}/deno.json`);
+    `${LOCATION}/deno.json`);
   const json = parse(metadata) as { version: string };
   return json.version;
 })();
@@ -70,6 +71,7 @@ type InternalCommand<T> =
 type ValidCommand<T> = Extract<InternalCommand<T>, keyof T>;
 
 interface ICLI {
+  location: string;
   version: string;
   usage: string;
   args: string[];
@@ -85,6 +87,8 @@ class CLI implements ICLI {
   private constructor() {
     this.flags = this.parse(this.args);
   }
+
+  readonly location: string = LOCATION as string;
   readonly args: string[] = Deno.args;
   readonly command: string = Deno.args[0];
   readonly flags: Record<string, string>;
