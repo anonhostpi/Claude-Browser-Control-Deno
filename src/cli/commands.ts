@@ -36,6 +36,14 @@ export class CLI {
     return this.client;
   }
 
+  /** Start server (blocking) */
+  async serve(): Promise<void> {
+    await startServer({
+      port: this.options.port,
+      parentPid: this.options.parentPid,
+    });
+  }
+
   /** Parse command line arguments */
   static parseArgs(args: string[]): { command: string; options: CLIOptions } {
     const command = args[0] ?? "";
