@@ -3,9 +3,38 @@
  * Scans the system for installed Chrome-based browsers
  */
 
-import { detectOS, type Platform } from "../os/mod.ts";
+import { OS, type Platform } from "../os/mod.ts";
 import { BROWSER_CONFIGS } from "./configs.ts";
 import type { BrowserInfo, BrowserConfig, BrowserPaths } from "./types.ts";
+
+export class Browsers {
+  /** Resolve environment variables in a path string */
+  static resolvePath(path: string): string {
+    return path.replace(/\$\{(\w+)\}/g, (_, varName) => {
+      return Deno.env.get(varName) ?? "";
+    });
+  }
+
+  /** Check if a file exists at the given path */
+  static async fileExists(path: string): Promise<boolean> {
+    try {
+      const stat = await Deno.stat(path);
+      return stat.isFile;
+    } catch {
+      return false;
+    }
+  }
+
+  /** Check if a directory exists at the given path */
+  static async dirExists(path: string): Promise<boolean> {
+    try {
+      const stat = await Deno.stat(path);
+      return stat.isDirectory;
+    } catch {
+      return false;
+    }
+  }
+}
 
 /**
  * Resolves environment variables in a path string
@@ -64,7 +93,7 @@ async function findExecutable(paths: string[]): Promise<string | null> {
  * Discovers a single browser installation
  */
 async function discoverBrowser(config: BrowserConfig): Promise<BrowserInfo | null> {
-  const os = detectOS();
+  const os = OS.instance;
   const paths = getPlatformPaths(config, os.platform);
   
   const executablePath = await findExecutable(paths.executables);
