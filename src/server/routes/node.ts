@@ -21,3 +21,31 @@ async function getNode(
 
   return { instance, targetId, nodeId: parseInt(nodeId) };
 }
+
+/** Check if node exists */
+nodeRoutes.head("/:browser/:profile/:target/:node", async (c) => {
+  const result = await getNode(
+    c.req.param("browser"),
+    c.req.param("profile"),
+    c.req.param("target"),
+    c.req.param("node")
+  );
+
+  if ("error" in result) {
+    return c.body(null, result.status);
+  }
+
+  const client = await connect({
+    port: result.instance.launched.debuggingPort,
+    target: result.targetId,
+  });
+
+  try {
+    await client.DOM.describeNode({ nodeId: result.nodeId });
+    return c.body(null, 204);
+  } catch {
+    return c.body(null, 404);
+  } finally {
+    await client.close();
+  }
+});
