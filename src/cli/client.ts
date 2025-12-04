@@ -152,4 +152,29 @@ export class Client {
     const res = await fetch(`${this.baseUrl}/${browser}/${profile}/${target}/?${params}`);
     return res.json();
   }
+
+  /** Check if node exists */
+  async isNodeExists(
+    browser: string,
+    profile: string,
+    target: string,
+    nodeId: string
+  ): Promise<boolean> {
+    const res = await fetch(
+      `${this.baseUrl}/${browser}/${profile}/${target}/${nodeId}/`,
+      { method: "HEAD" }
+    );
+    return res.status === 204;
+  }
+
+  /** Get node info */
+  async getNode(
+    browser: string,
+    profile: string,
+    target: string,
+    nodeId: string
+  ): Promise<unknown> {
+    const res = await fetch(`${this.baseUrl}/${browser}/${profile}/${target}/${nodeId}/`);
+    return res.json();
+  }
 }
