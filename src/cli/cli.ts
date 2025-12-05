@@ -59,6 +59,41 @@ export class CLI implements ICLI {
     this.#controller = Controller.create(location);
   }
 
+  static #expand(
+    input: string,
+    lookup: (name: string) => string | undefined,
+    { required = true } = {}
+  ): string {
+    return input.replace(/\$([A-Za-z0-9_]+)|\$\{([^}]+)\}/g, (_, a, b) => {
+      const name = a ?? b;
+      const val = lookup(name);
+
+      if (val === undefined) {
+        if (required) throw new Error(`Missing required variable ${name}`);
+        return "";
+      }
+
+      return val;
+    });
+  }
+  static expand(input: string, vars?: Record<string, string>): string {
+    return this.#expand(input, (name) => {
+      if (vars && name in vars) return vars[name];
+      return Deno.env.get(name);
+    });
+  }
+  static exists(type: "file" | "directory", path: string, evaluate = false, vars?: Record<string, string>): boolean {
+    const expanded = evaluate ? this.expand(path, vars) : path;
+    try {
+      const stat = Deno.statSync(expanded);
+      if (!stat) return false;
+
+      return type === "file" ? stat.isFile : stat.isDirectory;
+    } catch {
+      return false;
+    }
+  }
+
   readonly location: string;
   readonly version: string;
   readonly usage: string;
