@@ -22,8 +22,8 @@ browserRoutes.get("/:browser", async (c) => {
   return c.json({
     type: browser.type,
     name: browser.name,
-    path: browser.executablePath,
-    userDataDir: browser.userDataDir,
+    path: browser.executable,
+    userDataDir: browser.user_data,
     profiles: profiles.map((p) => ({
       name: p.name,
       displayName: p.displayName,

@@ -6,6 +6,7 @@
 import { Hono } from "hono";
 import { connect } from "../../cdp/mod.ts";
 import { registry } from "../registry.ts";
+import { ContentfulStatusCode, StatusCode } from "hono/utils/http-status";
 
 export const nodeRoutes = new Hono();
 
@@ -23,7 +24,7 @@ async function getNode(
 }
 
 /** Check if node exists */
-nodeRoutes.head("/:browser/:profile/:target/:node", async (c) => {
+nodeRoutes.on("HEAD", "/:browser/:profile/:target/:node", async (c) => {
   const result = await getNode(
     c.req.param("browser"),
     c.req.param("profile"),
@@ -32,7 +33,7 @@ nodeRoutes.head("/:browser/:profile/:target/:node", async (c) => {
   );
 
   if ("error" in result) {
-    return c.body(null, result.status);
+    return c.body(null, result.status as StatusCode);
   }
 
   const client = await connect({
@@ -60,7 +61,7 @@ nodeRoutes.get("/:browser/:profile/:target/:node", async (c) => {
   );
 
   if ("error" in result) {
-    return c.json({ error: result.error }, result.status);
+    return c.json({ error: result.error }, result.status as ContentfulStatusCode);
   }
 
   const client = await connect({
@@ -72,7 +73,7 @@ nodeRoutes.get("/:browser/:profile/:target/:node", async (c) => {
     // Return children if requested
     if (c.req.query("children") !== undefined) {
       const { node } = await client.DOM.describeNode({ nodeId: result.nodeId, depth: 1 });
-      const children = node.children?.map((child) => ({
+      const children = node.children?.map((child: { nodeId: number; nodeName: string; nodeType: number }) => ({
         nodeId: child.nodeId,
         nodeName: child.nodeName,
         nodeType: child.nodeType,
@@ -106,7 +107,7 @@ nodeRoutes.patch("/:browser/:profile/:target/:node", async (c) => {
   );
 
   if ("error" in result) {
-    return c.json({ error: result.error }, result.status);
+    return c.json({ error: result.error }, result.status as ContentfulStatusCode);
   }
 
   const body = await c.req.json();

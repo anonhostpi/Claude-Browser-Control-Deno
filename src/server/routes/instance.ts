@@ -13,7 +13,7 @@ import { registry } from "../registry.ts";
 export const instanceRoutes = new Hono();
 
 /** Check if instance is running */
-instanceRoutes.head("/:browser/:profile", (c) => {
+instanceRoutes.on("HEAD", "/:browser/:profile", (c) => {
   const browser = c.req.param("browser");
   const profile = c.req.param("profile");
 

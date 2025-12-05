@@ -28,11 +28,11 @@ Deno.test("BROWSER_CONFIGS have paths for all platforms", () => {
 
     // Each platform should have executables and userDataDir
     assertExists(config.paths.windows.executables);
-    assertExists(config.paths.windows.userDataDir);
+    assertExists(config.paths.windows.user_data);
     assertExists(config.paths.darwin.executables);
-    assertExists(config.paths.darwin.userDataDir);
+    assertExists(config.paths.darwin.user_data);
     assertExists(config.paths.linux.executables);
-    assertExists(config.paths.linux.userDataDir);
+    assertExists(config.paths.linux.user_data);
   }
 });
 
@@ -48,9 +48,9 @@ Deno.test("discovered browsers have required properties", async () => {
   for (const browser of browsers) {
     assertExists(browser.type);
     assertExists(browser.name);
-    assertExists(browser.executablePath);
-    assertExists(browser.userDataDir);
-    assertEquals(browser.isInstalled, true);
+    assertExists(browser.executable);
+    assertExists(browser.user_data);
+    assertEquals(browser.installed, true);
   }
 });
 
@@ -61,7 +61,7 @@ Deno.test("getDefaultBrowser returns a browser or null", async () => {
   if (browser) {
     assertExists(browser.type);
     assertExists(browser.name);
-    assertExists(browser.executablePath);
+    assertExists(browser.executable);
   }
 });
 

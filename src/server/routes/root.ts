@@ -9,7 +9,7 @@ import { discoverBrowsers } from "../../browsers/mod.ts";
 export const rootRoutes = new Hono();
 
 /** Health check */
-rootRoutes.head("/", (c) => {
+rootRoutes.on("HEAD", "/", (c) => {
   return c.body(null, 204);
 });
 
@@ -20,7 +20,7 @@ rootRoutes.get("/", async (c) => {
     browsers: browsers.map((b) => ({
       type: b.type,
       name: b.name,
-      path: b.executablePath,
+      path: b.executable,
     })),
   });
 });

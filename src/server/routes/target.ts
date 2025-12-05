@@ -6,6 +6,7 @@
 import { Hono } from "hono";
 import { listTargets, activateTarget, closeTarget, connect } from "../../cdp/mod.ts";
 import { registry } from "../registry.ts";
+import { ContentfulStatusCode, StatusCode } from "hono/utils/http-status";
 
 export const targetRoutes = new Hono();
 
@@ -26,7 +27,7 @@ async function getTarget(
 }
 
 /** Check if target exists */
-targetRoutes.head("/:browser/:profile/:target", async (c) => {
+targetRoutes.on("HEAD", "/:browser/:profile/:target", async (c) => {
   const result = await getTarget(
     c.req.param("browser"),
     c.req.param("profile"),
@@ -34,7 +35,7 @@ targetRoutes.head("/:browser/:profile/:target", async (c) => {
   );
 
   if ("error" in result) {
-    return c.body(null, result.status);
+    return c.body(null, result.status as StatusCode);
   }
   return c.body(null, 204);
 });
@@ -48,7 +49,7 @@ targetRoutes.get("/:browser/:profile/:target", async (c) => {
   );
 
   if ("error" in result) {
-    return c.json({ error: result.error }, result.status);
+    return c.json({ error: result.error }, result.status as ContentfulStatusCode);
   }
 
   // Check for WebSocket upgrade
@@ -127,7 +128,7 @@ targetRoutes.delete("/:browser/:profile/:target", async (c) => {
   );
 
   if ("error" in result) {
-    return c.json({ error: result.error }, result.status);
+    return c.json({ error: result.error }, result.status as ContentfulStatusCode);
   }
 
   await closeTarget(result.target.id, {
@@ -146,7 +147,7 @@ targetRoutes.post("/:browser/:profile/:target", async (c) => {
   );
 
   if ("error" in result) {
-    return c.json({ error: result.error }, result.status);
+    return c.json({ error: result.error }, result.status as ContentfulStatusCode);
   }
 
   const body = await c.req.json();
@@ -181,7 +182,7 @@ targetRoutes.patch("/:browser/:profile/:target", async (c) => {
   );
 
   if ("error" in result) {
-    return c.json({ error: result.error }, result.status);
+    return c.json({ error: result.error }, result.status as ContentfulStatusCode);
   }
 
   const body = await c.req.json();
