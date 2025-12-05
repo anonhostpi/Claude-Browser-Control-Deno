@@ -34,19 +34,19 @@ deno task start launch --url https://example.com
 
 ```typescript
 import {
-  discoverBrowsers,
-  getDefaultBrowser,
+  Browser,
+
   getProfile,
   launchBrowser,
   CDPClient,
 } from "./src/mod.ts";
 
 // Discover browsers
-const browsers = await discoverBrowsers();
+const browsers = Browser.discover();
 console.log("Installed browsers:", browsers.map(b => b.name));
 
 // Get default browser
-const browser = await getDefaultBrowser();
+const browser = Browser.default;
 
 // Get Claude profile (creates if needed)
 const profile = await getProfile(browser);
@@ -105,7 +105,14 @@ deno task repl
 Then use the imported `browser` namespace:
 
 ```typescript
-> const browsers = await browser.discoverBrowsers()
+> const browsers = await browser.Browser.discover()
+> console.log(browsers)
+```
+
+or use the exports directly:
+
+```typescript
+> const browsers = await Browser.discover()
 > console.log(browsers)
 ```
 
