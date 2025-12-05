@@ -27,7 +27,7 @@ browserRoutes.get("/:browser", async (c) => {
     userDataDir: browser.user_data,
     profiles: profiles.map((p) => ({
       name: p.name,
-      displayName: p.displayName,
+      displayName: p.display,
       isDefault: p.isDefault,
     })),
   });
