@@ -4,14 +4,15 @@
  */
 
 import { Hono } from "hono";
-import { getBrowser, discoverProfiles } from "../../browsers/mod.ts";
+import { getBrowser, Browser, Type} from "../../browsers/mod.ts";
+import { discoverProfiles } from "../../profiles/discover.ts";
 
 export const browserRoutes = new Hono();
 
 /** Get browser info and profiles */
 browserRoutes.get("/:browser", async (c) => {
   const browserType = c.req.param("browser");
-  const browser = await getBrowser(browserType);
+  const browser = await getBrowser(browserType as Type);
 
   if (!browser) {
     return c.json({ error: "Browser not found" }, 404);

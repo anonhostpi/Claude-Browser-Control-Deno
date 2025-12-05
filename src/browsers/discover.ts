@@ -7,11 +7,6 @@ import { Browser, IBrowser } from "./browser.ts";
 import { Type } from "./metadata.ts";
 import { CLI } from "../cli/cli.ts";
 
-/** @deprecated Use Browsers.discover */
-export async function discoverBrowsers(): Promise<IBrowser[]> {
-  return Browser.discover();
-}
-
 /** @deprecated Use Browsers.get */
 export async function getBrowser(type: Type): Promise<IBrowser | null> {
   return Browser.get(type);

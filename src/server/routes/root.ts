@@ -4,7 +4,7 @@
  */
 
 import { Hono } from "hono";
-import { discoverBrowsers } from "../../browsers/mod.ts";
+import { Browser } from "../../browsers/mod.ts";
 
 export const rootRoutes = new Hono();
 
@@ -15,7 +15,7 @@ rootRoutes.on("HEAD", "/", (c) => {
 
 /** List available browsers */
 rootRoutes.get("/", async (c) => {
-  const browsers = await discoverBrowsers();
+  const browsers = Browser.discover();
   return c.json({
     browsers: browsers.map((b) => ({
       type: b.type,

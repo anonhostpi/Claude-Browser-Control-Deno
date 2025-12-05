@@ -4,7 +4,8 @@
 
 import { assertEquals, assertExists } from "@std/assert";
 import {
-  discoverBrowsers,
+  Browser,
+  Type,
   getDefaultBrowser,
   getBrowser,
   BROWSER_CONFIGS,
@@ -36,14 +37,14 @@ Deno.test("BROWSER_CONFIGS have paths for all platforms", () => {
   }
 });
 
-Deno.test("discoverBrowsers returns an array", async () => {
-  const browsers = await discoverBrowsers();
+Deno.test("Browser.discover returns an array", async () => {
+  const browsers = await Browser.discover();
 
   assertEquals(Array.isArray(browsers), true);
 });
 
 Deno.test("discovered browsers have required properties", async () => {
-  const browsers = await discoverBrowsers();
+  const browsers = await Browser.discover();
 
   for (const browser of browsers) {
     assertExists(browser.type);
@@ -66,7 +67,7 @@ Deno.test("getDefaultBrowser returns a browser or null", async () => {
 });
 
 Deno.test("getBrowser returns null for unknown browser type", async () => {
-  const browser = await getBrowser("nonexistent-browser");
+  const browser = await getBrowser("nonexistent-browser" as Type);
   assertEquals(browser, null);
 });
 
