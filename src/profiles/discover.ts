@@ -34,7 +34,7 @@ export class Profiles {
   /** Discover all profiles for a given browser */
   static async discover(browser: BrowserInfo): Promise<ProfileInfo[]> {
     const profiles: ProfileInfo[] = [];
-    const userDataDir = browser.userDataDir;
+    const userDataDir = browser.user_data;
 
     try {
       for await (const entry of Deno.readDir(userDataDir)) {
@@ -75,7 +75,7 @@ export class Profiles {
 
   /** Get or create the Claude profile directory */
   static async getClaude(browser: BrowserInfo): Promise<ProfileInfo> {
-    const userDataDir = browser.userDataDir;
+    const userDataDir = browser.user_data;
     const claudeProfilePath = join(userDataDir, CLAUDE_PROFILE_NAME);
 
     const existingProfile = await this.find(browser, CLAUDE_PROFILE_NAME);

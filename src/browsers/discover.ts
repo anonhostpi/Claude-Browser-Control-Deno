@@ -3,135 +3,98 @@
  * Scans the system for installed Chrome-based browsers
  */
 
-import { OS, type Platform } from "../os/mod.ts";
+import { OS } from "../os/mod.ts";
 import { BROWSER_CONFIGS } from "./configs.ts";
-import type { BrowserInfo, BrowserConfig, BrowserPaths } from "./types.ts";
+import type { BrowserInfo, BrowserConfig, BrowserType } from "./types.ts";
+import { CLI } from "../cli/cli.ts";
+export class Browser implements BrowserInfo {
+  static check(query: BrowserConfig): Browser {
+    const os = OS.instance;
+    const paths = query.paths[os.platform];
+    let exe: string;
+    for (const path of paths.executables) {
+      if (CLI.exists("file", path, true)) {
+        exe = path;
+        break;
+      }
+    }
 
-export class Browsers {
-  /** Resolve environment variables in a path string */
-  static resolvePath(path: string): string {
-    return path.replace(/\$\{(\w+)\}/g, (_, varName) => {
-      return Deno.env.get(varName) ?? "";
+    const data_dir = CLI.expand(paths.user_data);
+    return new Browser({
+      type: query.type,
+      name: query.name,
+      executable: exe!,
+      user_data: data_dir,
+      installed: CLI.exists("file", exe!, true),
     });
   }
 
-  /** Check if a file exists at the given path */
-  static async fileExists(path: string): Promise<boolean> {
-    try {
-      const stat = await Deno.stat(path);
-      return stat.isFile;
-    } catch {
-      return false;
-    }
-  }
-
-  /** Check if a directory exists at the given path */
-  static async dirExists(path: string): Promise<boolean> {
-    try {
-      const stat = await Deno.stat(path);
-      return stat.isDirectory;
-    } catch {
-      return false;
-    }
-  }
-
-  /** Get browser paths for the current platform */
-  static getPlatformPaths(config: BrowserConfig, platform: Platform): BrowserPaths {
-    return config.paths[platform];
-  }
-
-  /** Find the first existing executable from a list of possible paths */
-  static async findExecutable(paths: string[]): Promise<string | null> {
-    for (const path of paths) {
-      const resolved = this.resolvePath(path);
-      if (await this.fileExists(resolved)) {
-        return resolved;
-      }
-    }
-    return null;
-  }
-
-  /** Discover a single browser installation */
-  static async #discoverOne(config: BrowserConfig): Promise<BrowserInfo | null> {
-    const os = OS.instance;
-    const paths = this.getPlatformPaths(config, os.platform);
-
-    const executablePath = await this.findExecutable(paths.executables);
-    if (!executablePath) {
-      return null;
-    }
-
-    const userDataDir = this.resolvePath(paths.userDataDir);
-
-    return {
-      type: config.type,
-      name: config.name,
-      executablePath,
-      userDataDir,
-      isInstalled: true,
-    };
-  }
-
-  /** Discover all installed Chrome-based browsers */
-  static async discover(): Promise<BrowserInfo[]> {
-    const browsers: BrowserInfo[] = [];
+  static discover(): Browser[] {
+    const browsers: Browser[] = [];
     for (const config of BROWSER_CONFIGS) {
-      const browser = await this.#discoverOne(config);
-      if (browser) {
+      const browser = Browser.check(config);
+      if (browser.installed)
         browsers.push(browser);
-      }
     }
     return browsers;
   }
 
-  /** Get a specific browser by type if installed */
-  static async get(type: string): Promise<BrowserInfo | null> {
+  static get(type: BrowserType): Browser | null {
     const config = BROWSER_CONFIGS.find((c) => c.type === type);
-    if (!config) {
-      return null;
-    }
-    return this.#discoverOne(config);
+    if (!config) return null;
+    const browser = Browser.check(config);
+    return browser.installed ? browser : null;
   }
 
-  /** Get the first available browser (prefers Chrome > Edge > Brave > others) */
-  static async getDefault(): Promise<BrowserInfo | null> {
-    const preferredOrder = ["chrome", "edge", "brave", "chromium", "vivaldi"];
-    for (const type of preferredOrder) {
-      const browser = await this.get(type);
-      if (browser) {
+  static get default(): Browser | null {
+    const preference: BrowserType[] = [
+      "chrome", "edge", "brave", "chromium", "vivaldi"
+    ];
+    for (const type of preference) {
+      const browser = Browser.get(type);
+      if (browser)
         return browser;
-      }
     }
     return null;
   }
+
+  constructor(info: BrowserInfo) {
+    Object.assign(this, info);
+  }
+  readonly type!: BrowserType;
+  readonly name!: string;
+  readonly executable!: string;
+  readonly user_data!: string;
+  readonly installed!: boolean;
+  readonly version?: string;
 }
 
 /** @deprecated Use Browsers.discover */
-export function discoverBrowsers(): Promise<BrowserInfo[]> {
-  return Browsers.discover();
+export async function discoverBrowsers(): Promise<BrowserInfo[]> {
+  return Browser.discover();
 }
 
 /** @deprecated Use Browsers.get */
-export function getBrowser(type: string): Promise<BrowserInfo | null> {
-  return Browsers.get(type);
+export async function getBrowser(type: BrowserType): Promise<BrowserInfo | null> {
+  return Browser.get(type);
 }
 
 /** @deprecated Use Browsers.getDefault */
-export function getDefaultBrowser(): Promise<BrowserInfo | null> {
-  return Browsers.getDefault();
+export async function getDefaultBrowser(): Promise<BrowserInfo | null> {
+  return Browser.default;
 }
 
 /** @deprecated Use Browsers.resolvePath */
 export function resolvePath(path: string): string {
-  return Browsers.resolvePath(path);
+  return CLI.expand(path);
 }
 
 /** @deprecated Use Browsers.fileExists */
-export function fileExists(path: string): Promise<boolean> {
-  return Browsers.fileExists(path);
+export async function fileExists(path: string): Promise<boolean> {
+  return CLI.exists("file", path, true);
 }
 
 /** @deprecated Use Browsers.dirExists */
-export function dirExists(path: string): Promise<boolean> {
-  return Browsers.dirExists(path);
+export async function dirExists(path: string): Promise<boolean> {
+  return CLI.exists("directory", path, true);
 }

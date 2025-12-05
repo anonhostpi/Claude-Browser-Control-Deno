@@ -8,16 +8,16 @@ export interface BrowserPaths {
   /** Possible executable paths for this browser */
   executables: string[];
   /** User data directory for profiles */
-  userDataDir: string;
+  user_data: string;
 }
 
 export interface BrowserInfo {
   type: BrowserType;
   name: string;
-  executablePath: string;
-  userDataDir: string;
+  executable: string;
+  user_data: string;
   version?: string;
-  isInstalled: boolean;
+  installed: boolean;
 }
 
 export interface BrowserConfig {
