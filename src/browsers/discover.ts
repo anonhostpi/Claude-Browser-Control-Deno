@@ -3,71 +3,9 @@
  * Scans the system for installed Chrome-based browsers
  */
 
-import { OS } from "../os/mod.ts";
-import { BROWSER_CONFIGS } from "./configs.ts";
-import type { IBrowser, BrowserConfig, BrowserType } from "./types.ts";
+import { Browser, IBrowser } from "./browser.ts";
+import { Type } from "./metadata.ts";
 import { CLI } from "../cli/cli.ts";
-export class Browser implements IBrowser {
-  static check(query: BrowserConfig): Browser {
-    const os = OS.instance;
-    const paths = query.paths[os.platform];
-    let exe: string;
-    for (const path of paths.executables) {
-      if (CLI.exists("file", path, true)) {
-        exe = path;
-        break;
-      }
-    }
-
-    const data_dir = CLI.expand(paths.user_data);
-    return new Browser({
-      type: query.type,
-      name: query.name,
-      executable: exe!,
-      user_data: data_dir,
-      installed: CLI.exists("file", exe!, true),
-    });
-  }
-
-  static discover(): Browser[] {
-    const browsers: Browser[] = [];
-    for (const config of BROWSER_CONFIGS) {
-      const browser = Browser.check(config);
-      if (browser.installed)
-        browsers.push(browser);
-    }
-    return browsers;
-  }
-
-  static get(type: BrowserType): Browser | null {
-    const config = BROWSER_CONFIGS.find((c) => c.type === type);
-    if (!config) return null;
-    const browser = Browser.check(config);
-    return browser.installed ? browser : null;
-  }
-
-  static get default(): Browser | null {
-    const preference: BrowserType[] = [
-      "chrome", "edge", "brave", "chromium", "vivaldi"
-    ];
-    for (const type of preference) {
-      const browser = Browser.get(type);
-      if (browser)
-        return browser;
-    }
-    return null;
-  }
-
-  constructor(info: IBrowser) {
-    Object.assign(this, info);
-  }
-  readonly type!: BrowserType;
-  readonly name!: string;
-  readonly executable!: string;
-  readonly user_data!: string;
-  readonly installed!: boolean;
-  readonly version?: string;
-}
 
 /** @deprecated Use Browsers.discover */
 export async function discoverBrowsers(): Promise<IBrowser[]> {
@@ -75,7 +13,7 @@ export async function discoverBrowsers(): Promise<IBrowser[]> {
 }
 
 /** @deprecated Use Browsers.get */
-export async function getBrowser(type: BrowserType): Promise<IBrowser | null> {
+export async function getBrowser(type: Type): Promise<IBrowser | null> {
   return Browser.get(type);
 }
 
