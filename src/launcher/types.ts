@@ -2,12 +2,12 @@
  * Launcher Types
  */
 
-import type { BrowserInfo } from "../browsers/mod.ts";
+import type { IBrowser } from "../browsers/mod.ts";
 import type { ProfileInfo } from "../profiles/mod.ts";
 
 export interface LaunchOptions {
   /** Browser to launch */
-  browser: BrowserInfo;
+  browser: IBrowser;
   /** Profile to use */
   profile: ProfileInfo;
   /** Port for Chrome DevTools Protocol */
@@ -32,7 +32,7 @@ export interface LaunchedBrowser {
   /** WebSocket URL for CDP connection */
   wsEndpoint: string;
   /** Browser info */
-  browser: BrowserInfo;
+  browser: IBrowser;
   /** Profile info */
   profile: ProfileInfo;
   /** Kill the browser process */

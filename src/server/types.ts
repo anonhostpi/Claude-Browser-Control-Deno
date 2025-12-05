@@ -2,7 +2,7 @@
  * Server Types
  */
 
-import type { BrowserInfo } from "../browsers/mod.ts";
+import type { IBrowser } from "../browsers/mod.ts";
 import type { ProfileInfo } from "../profiles/mod.ts";
 import type { LaunchedBrowser } from "../launcher/mod.ts";
 
@@ -23,7 +23,7 @@ export interface InstanceKey {
 /** Running browser instance */
 export interface Instance {
   key: InstanceKey;
-  browser: BrowserInfo;
+  browser: IBrowser;
   profile: ProfileInfo;
   launched: LaunchedBrowser;
   createdAt: Date;

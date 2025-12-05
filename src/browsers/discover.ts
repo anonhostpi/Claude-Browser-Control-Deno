@@ -5,9 +5,9 @@
 
 import { OS } from "../os/mod.ts";
 import { BROWSER_CONFIGS } from "./configs.ts";
-import type { BrowserInfo, BrowserConfig, BrowserType } from "./types.ts";
+import type { IBrowser, BrowserConfig, BrowserType } from "./types.ts";
 import { CLI } from "../cli/cli.ts";
-export class Browser implements BrowserInfo {
+export class Browser implements IBrowser {
   static check(query: BrowserConfig): Browser {
     const os = OS.instance;
     const paths = query.paths[os.platform];
@@ -58,7 +58,7 @@ export class Browser implements BrowserInfo {
     return null;
   }
 
-  constructor(info: BrowserInfo) {
+  constructor(info: IBrowser) {
     Object.assign(this, info);
   }
   readonly type!: BrowserType;
@@ -70,17 +70,17 @@ export class Browser implements BrowserInfo {
 }
 
 /** @deprecated Use Browsers.discover */
-export async function discoverBrowsers(): Promise<BrowserInfo[]> {
+export async function discoverBrowsers(): Promise<IBrowser[]> {
   return Browser.discover();
 }
 
 /** @deprecated Use Browsers.get */
-export async function getBrowser(type: BrowserType): Promise<BrowserInfo | null> {
+export async function getBrowser(type: BrowserType): Promise<IBrowser | null> {
   return Browser.get(type);
 }
 
 /** @deprecated Use Browsers.getDefault */
-export async function getDefaultBrowser(): Promise<BrowserInfo | null> {
+export async function getDefaultBrowser(): Promise<IBrowser | null> {
   return Browser.default;
 }
 

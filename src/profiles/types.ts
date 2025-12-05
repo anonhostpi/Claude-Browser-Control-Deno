@@ -8,7 +8,7 @@ export interface ProfileInfo {
   /** Full path to the profile directory */
   path: string;
   /** Display name from Preferences file if available */
-  displayName?: string;
+  display?: string;
   /** Whether this is the default profile */
   isDefault: boolean;
 }

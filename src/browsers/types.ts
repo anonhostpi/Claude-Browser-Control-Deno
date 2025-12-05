@@ -11,7 +11,7 @@ export interface BrowserPaths {
   user_data: string;
 }
 
-export interface BrowserInfo {
+export interface IBrowser {
   type: BrowserType;
   name: string;
   executable: string;

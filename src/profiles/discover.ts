@@ -4,7 +4,7 @@
  */
 
 import { join } from "https://deno.land/std@0.224.0/path/mod.ts";
-import type { BrowserInfo } from "../browsers/mod.ts";
+import type { IBrowser } from "../browsers/mod.ts";
 import type { ProfileInfo, ProfilePreferences } from "./types.ts";
 import { CLAUDE_PROFILE_NAME } from "./types.ts";
 
@@ -32,7 +32,7 @@ export class Profiles {
   }
 
   /** Discover all profiles for a given browser */
-  static async discover(browser: BrowserInfo): Promise<ProfileInfo[]> {
+  static async discover(browser: IBrowser): Promise<ProfileInfo[]> {
     const profiles: ProfileInfo[] = [];
     const userDataDir = browser.user_data;
 
@@ -53,7 +53,7 @@ export class Profiles {
           profiles.push({
             name: entry.name,
             path: profilePath,
-            displayName: prefs?.profile?.name ?? entry.name,
+            display: prefs?.profile?.name ?? entry.name,
             isDefault: entry.name === "Default",
           });
         }
@@ -66,15 +66,15 @@ export class Profiles {
   }
 
   /** Find a specific profile by name */
-  static async find(browser: BrowserInfo, profileName: string): Promise<ProfileInfo | null> {
+  static async find(browser: IBrowser, profileName: string): Promise<ProfileInfo | null> {
     const profiles = await this.discover(browser);
     return (
-      profiles.find((p) => p.name === profileName || p.displayName === profileName) ?? null
+      profiles.find((p) => p.name === profileName || p.display === profileName) ?? null
     );
   }
 
   /** Get or create the Claude profile directory */
-  static async getClaude(browser: BrowserInfo): Promise<ProfileInfo> {
+  static async getClaude(browser: IBrowser): Promise<ProfileInfo> {
     const userDataDir = browser.user_data;
     const claudeProfilePath = join(userDataDir, CLAUDE_PROFILE_NAME);
 
@@ -94,13 +94,13 @@ export class Profiles {
     return {
       name: CLAUDE_PROFILE_NAME,
       path: claudeProfilePath,
-      displayName: CLAUDE_PROFILE_NAME,
+      display: CLAUDE_PROFILE_NAME,
       isDefault: false,
     };
   }
 
   /** Get the appropriate profile - Claude profile by default, or specified profile */
-  static async get(browser: BrowserInfo, profileName?: string): Promise<ProfileInfo> {
+  static async get(browser: IBrowser, profileName?: string): Promise<ProfileInfo> {
     if (profileName) {
       const profile = await this.find(browser, profileName);
       if (!profile) {
@@ -114,26 +114,26 @@ export class Profiles {
 }
 
 /** @deprecated Use Profiles.discover */
-export function discoverProfiles(browser: BrowserInfo): Promise<ProfileInfo[]> {
+export function discoverProfiles(browser: IBrowser): Promise<ProfileInfo[]> {
   return Profiles.discover(browser);
 }
 
 /** @deprecated Use Profiles.find */
 export function findProfile(
-  browser: BrowserInfo,
+  browser: IBrowser,
   profileName: string
 ): Promise<ProfileInfo | null> {
   return Profiles.find(browser, profileName);
 }
 
 /** @deprecated Use Profiles.getClaude */
-export function getClaudeProfile(browser: BrowserInfo): Promise<ProfileInfo> {
+export function getClaudeProfile(browser: IBrowser): Promise<ProfileInfo> {
   return Profiles.getClaude(browser);
 }
 
 /** @deprecated Use Profiles.get */
 export function getProfile(
-  browser: BrowserInfo,
+  browser: IBrowser,
   profileName?: string
 ): Promise<ProfileInfo> {
   return Profiles.get(browser, profileName);
