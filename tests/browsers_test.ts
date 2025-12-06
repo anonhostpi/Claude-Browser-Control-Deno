@@ -7,7 +7,6 @@ import {
   Browser,
   Type,
   getDefaultBrowser,
-  getBrowser,
   BROWSER_CONFIGS,
 } from "../src/browsers/mod.ts";
 
@@ -66,14 +65,14 @@ Deno.test("getDefaultBrowser returns a browser or null", async () => {
   }
 });
 
-Deno.test("getBrowser returns null for unknown browser type", async () => {
-  const browser = await getBrowser("nonexistent-browser" as Type);
+Deno.test("Browser.get returns null for unknown browser type", async () => {
+  const browser = await Browser.get("nonexistent-browser" as Type);
   assertEquals(browser, null);
 });
 
-Deno.test("getBrowser returns browser for valid types", async () => {
+Deno.test("Browser.get returns browser for valid types", async () => {
   // Test with chrome - may or may not be installed
-  const chrome = await getBrowser("chrome");
+  const chrome = await Browser.get("chrome");
 
   if (chrome) {
     assertEquals(chrome.type, "chrome");

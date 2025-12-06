@@ -13,7 +13,6 @@ export * from "./cdp/mod.ts";
 
 // Convenience exports for common use cases
 import { detectOS } from "./os/mod.ts";
-import { getDefaultBrowser, getBrowser } from "./browsers/mod.ts";
 import { Browser } from "./browsers/mod.ts";
 import { CLI } from "./cli/cli.ts";
 import { getProfile, discoverProfiles, getClaudeProfile } from "./profiles/mod.ts";
@@ -26,8 +25,6 @@ export {
   CLI,
 
   detectOS,
-  getDefaultBrowser,
-  getBrowser,
   getProfile,
   discoverProfiles,
   getClaudeProfile,

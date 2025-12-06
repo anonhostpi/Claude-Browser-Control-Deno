@@ -4,7 +4,7 @@
  */
 
 import { Hono } from "hono";
-import { getBrowser } from "../../browsers/mod.ts";
+import { Browser } from "../../browsers/mod.ts";
 import { getProfile } from "../../profiles/mod.ts";
 import { launchBrowser } from "../../launcher/mod.ts";
 import { listTargets, createTarget } from "../../cdp/mod.ts";
@@ -37,7 +37,7 @@ instanceRoutes.get("/:browser/:profile", async (c) => {
 
   return c.json({
     browser: instance.browser.type,
-    profile: instance.profile.displayName,
+    profile: instance.profile.display,
     port: instance.launched.debuggingPort,
     wsEndpoint: instance.launched.wsEndpoint,
     createdAt: instance.createdAt.toISOString(),
@@ -82,14 +82,14 @@ instanceRoutes.put("/:browser/:profile", async (c) => {
   if (existing) {
     return c.json({
       browser: existing.browser.type,
-      profile: existing.profile.displayName,
+      profile: existing.profile.display,
       port: existing.launched.debuggingPort,
       wsEndpoint: existing.launched.wsEndpoint,
       created: false,
     });
   }
 
-  const browser = await getBrowser(browserType);
+  const browser = Browser.get(browserType);
   if (!browser) {
     return c.json({ error: "Browser not found" }, 404);
   }
