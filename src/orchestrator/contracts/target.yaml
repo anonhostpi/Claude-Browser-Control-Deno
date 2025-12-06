@@ -1,0 +1,353 @@
+# Target Level Contracts - /:browser/:profile/:target
+# Tab/page management
+#
+# Method semantics:
+# - GET: WebSocket upgrade (CDP passthrough) or target info
+# - POST: Browser/media control (navigate, refresh, play, pause, volume)
+# - PUT: Content control (document, permissions, certificates, navigator APIs)
+# - PATCH: Update target properties
+# - DELETE: Close target
+
+# WebSocket upgrade for CDP passthrough - MUST BE FIRST
+# Detected via Upgrade header, not request body
+- name: target:cdp
+  path: /:browser/:profile/:target
+  method: GET
+  description: Upgrade to WebSocket for direct CDP access
+  module: target/cdp.ts
+  request:
+    type: object
+    properties:
+      upgrade:
+        type: string
+        const: websocket
+        description: Detected via Upgrade header
+    required: [upgrade]
+  response:
+    type: "null"
+    description: Connection upgraded to WebSocket
+
+- name: target:exists
+  path: /:browser/:profile/:target
+  method: HEAD
+  description: Check if target exists
+  module: target/exists.ts
+  response:
+    type: "null"
+
+- name: target:info
+  path: /:browser/:profile/:target
+  method: GET
+  description: Get target info or query nodes
+  module: target/info.ts
+  request:
+    type: object
+    properties:
+      xpath:
+        type: string
+        description: XPath query to find nodes
+      css:
+        type: string
+        description: CSS selector query to find nodes
+  response:
+    type: object
+    properties:
+      id:
+        type: string
+      type:
+        type: string
+      title:
+        type: string
+      url:
+        type: string
+      webSocketDebuggerUrl:
+        type: string
+      nodes:
+        type: array
+        description: Present when xpath or css query is provided
+        items:
+          type: object
+          properties:
+            nodeId:
+              type: integer
+            nodeName:
+              type: string
+            nodeType:
+              type: integer
+          required: [nodeId, nodeName, nodeType]
+    required: [id, type, title, url]
+
+# POST = Browser/media control
+- name: target:control
+  path: /:browser/:profile/:target
+  method: POST
+  description: Browser and media control actions
+  module: target/control.ts
+  request:
+    type: object
+    properties:
+      # Navigation
+      navigate:
+        type: string
+        description: Navigate to URL
+      refresh:
+        type: boolean
+        description: Refresh the page
+      back:
+        type: boolean
+        description: Navigate back
+      forward:
+        type: boolean
+        description: Navigate forward
+      # Media control
+      play:
+        type: boolean
+        description: Play media
+      pause:
+        type: boolean
+        description: Pause media
+      mute:
+        type: boolean
+        description: Mute audio
+      volume:
+        type: number
+        minimum: 0
+        maximum: 1
+        description: Set volume (0-1)
+      # Tab control
+      activate:
+        type: boolean
+        description: Bring target to foreground
+      # Script execution
+      script:
+        type: string
+        description: Execute JavaScript
+      # Screenshot
+      screenshot:
+        type: object
+        properties:
+          format:
+            type: string
+            enum: [png, jpeg, webp]
+          quality:
+            type: integer
+            minimum: 0
+            maximum: 100
+          fullPage:
+            type: boolean
+  response:
+    type: object
+    description: Response varies by action
+
+- name: target:create
+  path: /:browser/:profile/:target
+  method: POST
+  description: Create new target (tab)
+  module: target/create.ts
+  request:
+    type: object
+    properties:
+      url:
+        type: string
+        description: URL to open in new target
+    required: [url]
+  response:
+    type: object
+    properties:
+      id:
+        type: string
+      type:
+        type: string
+      title:
+        type: string
+      url:
+        type: string
+    required: [id, type, title, url]
+
+# PUT = Content control (DOM, permissions, navigator APIs)
+- name: target:content
+  path: /:browser/:profile/:target
+  method: PUT
+  description: Content and document control
+  module: target/content.ts
+  request:
+    type: object
+    properties:
+      # Document replacement
+      document:
+        type: string
+        description: Replace document with HTML content
+      # Permissions
+      permissions:
+        type: object
+        description: Override permissions
+        properties:
+          geolocation:
+            type: string
+            enum: [granted, denied, prompt]
+          notifications:
+            type: string
+            enum: [granted, denied, prompt]
+          camera:
+            type: string
+            enum: [granted, denied, prompt]
+          microphone:
+            type: string
+            enum: [granted, denied, prompt]
+          clipboard-read:
+            type: string
+            enum: [granted, denied, prompt]
+          clipboard-write:
+            type: string
+            enum: [granted, denied, prompt]
+      # Certificates
+      certificates:
+        type: object
+        properties:
+          ignore:
+            type: boolean
+            description: Ignore certificate errors
+      # Cookies
+      cookies:
+        type: array
+        items:
+          type: object
+          properties:
+            name:
+              type: string
+            value:
+              type: string
+            domain:
+              type: string
+            path:
+              type: string
+            expires:
+              type: number
+            httpOnly:
+              type: boolean
+            secure:
+              type: boolean
+            sameSite:
+              type: string
+              enum: [Strict, Lax, None]
+          required: [name, value]
+      # Navigator API overrides
+      navigator:
+        type: object
+        properties:
+          # Geolocation mock
+          geolocation:
+            type: object
+            properties:
+              latitude:
+                type: number
+              longitude:
+                type: number
+              accuracy:
+                type: number
+            required: [latitude, longitude]
+          # Clipboard
+          clipboard:
+            type: object
+            properties:
+              text:
+                type: string
+                description: Write text to clipboard
+          # Media devices mock
+          mediaDevices:
+            type: object
+            properties:
+              mock:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    deviceId:
+                      type: string
+                    kind:
+                      type: string
+                      enum: [audioinput, audiooutput, videoinput]
+                    label:
+                      type: string
+                  required: [deviceId, kind, label]
+          # User agent override
+          userAgent:
+            type: string
+          # Language override
+          language:
+            type: string
+          # Platform override
+          platform:
+            type: string
+          # Hardware concurrency override
+          hardwareConcurrency:
+            type: integer
+          # Device memory override
+          deviceMemory:
+            type: number
+          # Online status
+          onLine:
+            type: boolean
+          # Bluetooth mock
+          bluetooth:
+            type: object
+            properties:
+              available:
+                type: boolean
+          # USB mock
+          usb:
+            type: object
+            properties:
+              devices:
+                type: array
+                items:
+                  type: object
+          # Serial mock
+          serial:
+            type: object
+            properties:
+              ports:
+                type: array
+                items:
+                  type: object
+  response:
+    type: object
+    properties:
+      success:
+        type: boolean
+      applied:
+        type: array
+        items:
+          type: string
+        description: List of applied changes
+    required: [success]
+
+- name: target:update
+  path: /:browser/:profile/:target
+  method: PATCH
+  description: Update target properties
+  module: target/update.ts
+  request:
+    type: object
+    properties:
+      # Legacy - consider deprecating in favor of POST control
+      navigate:
+        type: string
+        description: Navigate to URL (deprecated, use POST)
+      script:
+        type: string
+        description: Execute JavaScript (deprecated, use POST)
+      activate:
+        type: boolean
+        description: Bring target to foreground (deprecated, use POST)
+  response:
+    type: object
+    description: Response varies by action
+
+- name: target:close
+  path: /:browser/:profile/:target
+  method: DELETE
+  description: Close target (tab)
+  module: target/close.ts
+  response:
+    type: "null"

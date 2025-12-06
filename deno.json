@@ -16,16 +16,22 @@
     "fmt": "deno fmt",
     "fmt:check": "deno fmt --check",
     "check": "deno check src/mod.ts main.ts",
-    "doc": "deno doc --html --name='Claude Browser Control' --output=docs src/mod.ts"
+    "doc": "deno doc --html --name='Claude Browser Control' --output=docs src/mod.ts",
+    "transpile": "deno run --allow-read --allow-write src/orchestrator/transpile.ts --ts src/orchestrator/contracts/api.yaml src/orchestrator/contracts/api.ts"
   },
   "imports": {
     "@std/path": "jsr:@std/path@^1",
     "@std/jsonc": "jsr:@std/jsonc@^1",
     "@std/assert": "jsr:@std/assert@^1",
     "@std/testing": "jsr:@std/testing@^1",
+    "@std/toml": "jsr:@std/toml@^1.0.11",
+    "@std/yaml": "jsr:@std/yaml@^1.0.10",
     "@types/chrome-remote-interface": "npm:@types/chrome-remote-interface@^0.31.14",
+    "ajv": "npm:ajv@^8.17.1",
     "chrome-remote-interface": "npm:chrome-remote-interface@^0.33.3",
-    "hono": "jsr:@hono/hono@^4"
+    "devtools-protocol": "npm:devtools-protocol@^0.0.1551306",
+    "hono": "jsr:@hono/hono@^4",
+    "json-schema-to-ts": "npm:json-schema-to-ts@^3.1.1"
   },
   "compilerOptions": {
     "strict": true

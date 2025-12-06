@@ -24,3 +24,6 @@ coverage/
 
 # Temporary files
 temp/
+
+# Generated contract files
+src/orchestrator/contracts/*.ts

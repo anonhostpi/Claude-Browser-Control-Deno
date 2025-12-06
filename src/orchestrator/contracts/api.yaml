@@ -1,0 +1,34 @@
+# Browser Control API Contracts
+#
+# URL Pattern: /:browser/:profile/:target/:node
+# - browser: Browser type (chrome, edge, firefox, etc.)
+# - profile: Profile name or "default"
+# - target: Target ID (tab/page)
+# - node: Node ID (DOM element)
+#
+# Method semantics:
+# - HEAD: Health/existence checks
+# - GET: Queries and informational data
+# - POST: Creation operations
+# - PUT: Replacement operations
+# - PATCH: Update operations
+# - DELETE: Deletion/cleanup operations
+#
+# Request body takes precedence over URL params when present.
+# In absence of body, URL params are used for input.
+
+contracts:
+  # Root Level - /
+  - $include: ./root.yaml
+
+  # Browser Level - /:browser
+  - $include: ./browser.yaml
+
+  # Instance Level - /:browser/:profile
+  - $include: ./instance.yaml
+
+  # Target Level - /:browser/:profile/:target
+  - $include: ./target.yaml
+
+  # Node Level - /:browser/:profile/:target/:node
+  - $include: ./node.yaml

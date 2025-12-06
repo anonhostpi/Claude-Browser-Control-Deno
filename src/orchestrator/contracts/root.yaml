@@ -1,0 +1,45 @@
+# Root Level Contracts - /
+# Server health and browser discovery
+
+- name: root:health
+  path: /
+  method: HEAD
+  description: Server health check
+  module: root/health.ts
+  response:
+    type: "null"
+
+- name: root:list
+  path: /
+  method: GET
+  description: List available browsers
+  module: root/list.ts
+  response:
+    type: object
+    properties:
+      browsers:
+        type: array
+        items:
+          type: object
+          properties:
+            type:
+              type: string
+            name:
+              type: string
+            available:
+              type: boolean
+          required: [type, name, available]
+    required: [browsers]
+
+- name: root:killAll
+  path: /
+  method: DELETE
+  description: Kill all browser instances
+  module: root/killAll.ts
+  response:
+    type: object
+    properties:
+      killed:
+        type: integer
+        description: Number of instances killed
+    required: [killed]

@@ -1,0 +1,212 @@
+# Node Level Contracts - /:browser/:profile/:target/:node
+# DOM node interaction
+
+- name: node:exists
+  path: /:browser/:profile/:target/:node
+  method: HEAD
+  description: Check if node exists
+  module: node/exists.ts
+  response:
+    type: "null"
+
+- name: node:info
+  path: /:browser/:profile/:target/:node
+  method: GET
+  description: Get node info or children
+  module: node/info.ts
+  request:
+    type: object
+    properties:
+      children:
+        type: boolean
+        description: Return child nodes instead of node info
+      depth:
+        type: integer
+        description: Depth to traverse for children (default 1)
+  response:
+    type: object
+    properties:
+      nodeId:
+        type: integer
+      nodeName:
+        type: string
+      nodeType:
+        type: integer
+      nodeValue:
+        type: string
+      attributes:
+        type: array
+        items:
+          type: string
+      children:
+        type: array
+        description: Present when children=true
+        items:
+          type: object
+          properties:
+            nodeId:
+              type: integer
+            nodeName:
+              type: string
+            nodeType:
+              type: integer
+          required: [nodeId, nodeName, nodeType]
+    required: [nodeId, nodeName, nodeType]
+
+- name: node:create
+  path: /:browser/:profile/:target/:node
+  method: POST
+  description: Create child node
+  module: node/create.ts
+  request:
+    type: object
+    properties:
+      tagName:
+        type: string
+        description: Tag name for new element
+      html:
+        type: string
+        description: HTML content to insert as child
+      text:
+        type: string
+        description: Text content to insert as child
+      position:
+        type: string
+        enum: [beforebegin, afterbegin, beforeend, afterend]
+        description: Insert position relative to node (default beforeend)
+      attributes:
+        type: object
+        description: Attributes to set on new element
+        additionalProperties:
+          type: string
+  response:
+    type: object
+    properties:
+      nodeId:
+        type: integer
+        description: ID of created node
+      nodeName:
+        type: string
+      nodeType:
+        type: integer
+    required: [nodeId, nodeName, nodeType]
+
+- name: node:replace
+  path: /:browser/:profile/:target/:node
+  method: PUT
+  description: Replace node content
+  module: node/replace.ts
+  request:
+    type: object
+    properties:
+      html:
+        type: string
+        description: Replace with HTML content (outerHTML)
+      innerHTML:
+        type: string
+        description: Replace inner content only
+      text:
+        type: string
+        description: Replace with text content
+      value:
+        type: string
+        description: Set input/textarea value
+  response:
+    type: object
+    properties:
+      success:
+        type: boolean
+      nodeId:
+        type: integer
+        description: ID of the node (may change if replaced)
+    required: [success]
+
+- name: node:interact
+  path: /:browser/:profile/:target/:node
+  method: PATCH
+  description: Interact with node
+  module: node/interact.ts
+  request:
+    type: object
+    properties:
+      click:
+        type: boolean
+        description: Click the node
+      focus:
+        type: boolean
+        description: Focus the node
+      blur:
+        type: boolean
+        description: Remove focus from the node
+      hover:
+        type: boolean
+        description: Hover over the node
+      type:
+        type: string
+        description: Text to type into the node
+      clear:
+        type: boolean
+        description: Clear the node's value before typing
+      select:
+        type: boolean
+        description: Select all text in the node
+      check:
+        type: boolean
+        description: Check checkbox/radio
+      uncheck:
+        type: boolean
+        description: Uncheck checkbox
+      setAttribute:
+        type: object
+        description: Set an attribute on the node
+        properties:
+          name:
+            type: string
+          value:
+            type: string
+        required: [name, value]
+      removeAttribute:
+        type: string
+        description: Name of attribute to remove
+      addClass:
+        type: string
+        description: Add CSS class
+      removeClass:
+        type: string
+        description: Remove CSS class
+      toggleClass:
+        type: string
+        description: Toggle CSS class
+      scrollIntoView:
+        type: boolean
+        description: Scroll the node into view
+      dispatchEvent:
+        type: object
+        description: Dispatch custom event
+        properties:
+          type:
+            type: string
+          bubbles:
+            type: boolean
+          cancelable:
+            type: boolean
+          detail:
+            type: object
+        required: [type]
+  response:
+    type: object
+    properties:
+      success:
+        type: boolean
+      action:
+        type: string
+        description: The action that was performed
+    required: [success, action]
+
+- name: node:remove
+  path: /:browser/:profile/:target/:node
+  method: DELETE
+  description: Remove node from DOM
+  module: node/remove.ts
+  response:
+    type: "null"

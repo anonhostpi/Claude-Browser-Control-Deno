@@ -1,0 +1,81 @@
+# Browser Level Contracts - /:browser
+# Browser availability and info
+
+- name: browser:exists
+  path: /:browser
+  method: HEAD
+  description: Check if browser is available
+  module: browser/exists.ts
+  response:
+    type: "null"
+
+- name: browser:info
+  path: /:browser
+  method: GET
+  description: Get browser info and available profiles
+  module: browser/info.ts
+  response:
+    type: object
+    properties:
+      type:
+        type: string
+      name:
+        type: string
+      path:
+        type: string
+      userDataDir:
+        type: string
+      profiles:
+        type: array
+        items:
+          type: object
+          properties:
+            name:
+              type: string
+            displayName:
+              type: string
+            isDefault:
+              type: boolean
+          required: [name, displayName, isDefault]
+    required: [type, name, path, userDataDir, profiles]
+
+- name: browser:launch
+  path: /:browser
+  method: POST
+  description: Launch browser with default profile
+  module: browser/launch.ts
+  request:
+    type: object
+    properties:
+      headless:
+        type: boolean
+        default: false
+      port:
+        type: integer
+        description: Optional debugging port
+  response:
+    type: object
+    properties:
+      browser:
+        type: string
+      profile:
+        type: string
+        description: Profile that was used (default)
+      port:
+        type: integer
+      wsEndpoint:
+        type: string
+    required: [browser, profile, port, wsEndpoint]
+
+- name: browser:killAll
+  path: /:browser
+  method: DELETE
+  description: Kill all instances of this browser type
+  module: browser/killAll.ts
+  response:
+    type: object
+    properties:
+      killed:
+        type: integer
+        description: Number of instances killed
+    required: [killed]
