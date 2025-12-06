@@ -4,206 +4,221 @@
  */
 
 import { DEFAULT_SERVER_PORT, DEFAULT_SERVER_HOSTNAME } from "../server/mod.ts";
-
-export interface ClientConfig {
-  hostname: string;
-  port: number;
-}
+import type CDP from "chrome-remote-interface";
 
 export class Client {
-  private baseUrl: string;
-
-  constructor(config: Partial<ClientConfig> = {}) {
-    const hostname = config.hostname ?? DEFAULT_SERVER_HOSTNAME;
-    const port = config.port ?? DEFAULT_SERVER_PORT;
-    this.baseUrl = `http://${hostname}:${port}`;
-  }
-
-  /** Check if server is alive */
-  async isAlive(): Promise<boolean> {
+  #url: string;
+  async #status(path?: string): Promise<boolean> {
     try {
-      const res = await fetch(`${this.baseUrl}/`, { method: "HEAD" });
-      return res.status === 204;
+      return (await fetch(
+        `${this.#url}/${path}`,
+        { method: "HEAD" }
+      )).status === 204;
     } catch {
       return false;
     }
   }
+  async #simple(
+    method: string,
+    path?: string
+  ): Promise<unknown> {
+    return (await fetch(
+      `${this.#url}/${path}`,
+      { method }
+    )).json();
+  }
+  async #complex(
+    method: string,
+    path?: string,
+    body?: unknown
+  ): Promise<unknown> {
+    return (await fetch(
+      `${this.#url}/${path}`,
+      {
+        method,
+
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }
+    )).json();
+  }
+  #delete(path?: string): Promise<void> {
+    return this.#simple("DELETE", path) as Promise<void>;
+  }
+  #get(path?: string): Promise<unknown> {
+    return this.#simple("GET", path);
+  }
+  #put(path?: string, body?: unknown): Promise<unknown> {
+    return this.#complex("PUT", path, body);
+  }
+  #patch(path?: string, body?: unknown): Promise<unknown> {
+    return this.#complex("PATCH", path, body);
+  }
+
+  constructor(config: Partial<CDP.Options> = {}) {
+    const hostname = config.host ?? DEFAULT_SERVER_HOSTNAME;
+    const port = config.port ?? DEFAULT_SERVER_PORT;
+    this.#url = `http://${hostname}:${port}`;
+  }
+
+  /** Check if server is alive */
+  isAlive(): Promise<boolean> {
+    return this.#status();
+  }
 
   /** List browsers */
-  async listBrowsers(): Promise<unknown> {
-    const res = await fetch(`${this.baseUrl}/`);
-    return res.json();
+  listBrowsers(): Promise<unknown> {
+    return this.#get();
   }
 
   /** Get browser info */
-  async getBrowser(browser: string): Promise<unknown> {
-    const res = await fetch(`${this.baseUrl}/${browser}/`);
-    return res.json();
+  getBrowser(browser: string): Promise<unknown> {
+    return this.#get(browser);
   }
 
   /** Check if instance is running */
-  async isInstanceRunning(browser: string, profile: string): Promise<boolean> {
-    const res = await fetch(`${this.baseUrl}/${browser}/${profile}/`, { method: "HEAD" });
-    return res.status === 204;
+  isInstanceRunning(browser: string, profile: string): Promise<boolean> {
+    return this.#status(`${browser}/${profile}/`);
   }
 
   /** Get instance info */
-  async getInstance(browser: string, profile: string): Promise<unknown> {
-    const res = await fetch(`${this.baseUrl}/${browser}/${profile}/`);
-    return res.json();
+  getInstance(browser: string, profile: string): Promise<unknown> {
+    return this.#get(`${browser}/${profile}/`);
   }
 
   /** Launch instance */
-  async launchInstance(
+  launchInstance(
     browser: string,
     profile: string,
     options: { headless?: boolean; port?: number } = {}
   ): Promise<unknown> {
-    const res = await fetch(`${this.baseUrl}/${browser}/${profile}/`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ type: "instance", ...options }),
-    });
-    return res.json();
+    return this.#put(
+      `${browser}/${profile}/`,
+      { type: "instance", ...options }
+    );
   }
 
   /** Close instance */
-  async closeInstance(browser: string, profile: string): Promise<void> {
-    await fetch(`${this.baseUrl}/${browser}/${profile}/`, { method: "DELETE" });
+  closeInstance(browser: string, profile: string): Promise<void> {
+    return this.#delete(`${browser}/${profile}/`);
   }
 
   /** Create target */
-  async createTarget(browser: string, profile: string, url?: string): Promise<unknown> {
-    const res = await fetch(`${this.baseUrl}/${browser}/${profile}/`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ type: "target", url }),
-    });
-    return res.json();
+  createTarget(browser: string, profile: string, url?: string): Promise<unknown> {
+    return this.#put(
+      `${browser}/${profile}/`,
+      { type: "target", url }
+    );
   }
 
   /** Get target info */
-  async getTarget(browser: string, profile: string, target: string): Promise<unknown> {
-    const res = await fetch(`${this.baseUrl}/${browser}/${profile}/${target}/`);
-    return res.json();
+  getTarget(browser: string, profile: string, target: string): Promise<unknown> {
+    return this.#get(`${browser}/${profile}/${target}/`);
   }
 
   /** Navigate target */
-  async navigate(browser: string, profile: string, target: string, url: string): Promise<unknown> {
-    const res = await fetch(`${this.baseUrl}/${browser}/${profile}/${target}/`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url }),
-    });
-    return res.json();
+  navigate(browser: string, profile: string, target: string, url: string): Promise<unknown> {
+    return this.#put(
+      `${browser}/${profile}/${target}/`,
+      { url }
+    );
   }
 
   /** Close target */
-  async closeTarget(browser: string, profile: string, target: string): Promise<void> {
-    await fetch(`${this.baseUrl}/${browser}/${profile}/${target}/`, { method: "DELETE" });
+  closeTarget(browser: string, profile: string, target: string): Promise<void> {
+    return this.#delete(`${browser}/${profile}/${target}/`);
   }
 
   /** Execute CDP command */
-  async cdp(
+  cdp(
     browser: string,
     profile: string,
     target: string,
     method: string,
     params?: unknown
   ): Promise<unknown> {
-    const res = await fetch(`${this.baseUrl}/${browser}/${profile}/${target}/`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ method, params }),
-    });
-    return res.json();
+    return this.#put(
+      `${browser}/${profile}/${target}/`,
+      { method, params }
+    );
   }
 
   /** Inject script */
-  async inject(browser: string, profile: string, target: string, script: string): Promise<unknown> {
-    const res = await fetch(`${this.baseUrl}/${browser}/${profile}/${target}/`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ script }),
-    });
-    return res.json();
+  inject(
+    browser: string,
+    profile: string,
+    target: string,
+    script: string
+  ): Promise<unknown> {
+    return this.#patch(
+      `${browser}/${profile}/${target}/`,
+      { script }
+    );
   }
 
   /** Query nodes by XPath */
-  async queryXPath(
+  queryXPath(
     browser: string,
     profile: string,
     target: string,
     xpath: string
   ): Promise<unknown> {
-    const params = new URLSearchParams({ xpath });
-    const res = await fetch(`${this.baseUrl}/${browser}/${profile}/${target}/?${params}`);
-    return res.json();
+    return this.#get(`${browser}/${profile}/${target}/?${new URLSearchParams({ xpath })}`);
   }
 
   /** Query nodes by CSS selector */
-  async queryCss(
+  queryCss(
     browser: string,
     profile: string,
     target: string,
     css: string
   ): Promise<unknown> {
-    const params = new URLSearchParams({ css });
-    const res = await fetch(`${this.baseUrl}/${browser}/${profile}/${target}/?${params}`);
-    return res.json();
+    return this.#get(`${browser}/${profile}/${target}/?${new URLSearchParams({ css })}`);
   }
 
   /** Check if node exists */
-  async isNodeExists(
+  isNodeExists(
     browser: string,
     profile: string,
     target: string,
     nodeId: string
   ): Promise<boolean> {
-    const res = await fetch(
-      `${this.baseUrl}/${browser}/${profile}/${target}/${nodeId}/`,
-      { method: "HEAD" }
+    return this.#status(
+      `${browser}/${profile}/${target}/${nodeId}/`
     );
-    return res.status === 204;
   }
 
   /** Get node info */
-  async getNode(
+  getNode(
     browser: string,
     profile: string,
     target: string,
     nodeId: string
   ): Promise<unknown> {
-    const res = await fetch(`${this.baseUrl}/${browser}/${profile}/${target}/${nodeId}/`);
-    return res.json();
+    return this.#get(`${browser}/${profile}/${target}/${nodeId}/`);
   }
 
   /** Get node children */
-  async getNodeChildren(
+  getNodeChildren(
     browser: string,
     profile: string,
     target: string,
     nodeId: string
   ): Promise<unknown> {
-    const res = await fetch(
-      `${this.baseUrl}/${browser}/${profile}/${target}/${nodeId}/?children`
-    );
-    return res.json();
+    return this.#get(`${browser}/${profile}/${target}/${nodeId}/?children`);
   }
 
   /** Interact with node (click, type, setAttribute) */
-  async interactNode(
+  interactNode(
     browser: string,
     profile: string,
     target: string,
     nodeId: string,
     action: { click?: boolean; type?: string; setAttribute?: { name: string; value: string } }
   ): Promise<unknown> {
-    const res = await fetch(`${this.baseUrl}/${browser}/${profile}/${target}/${nodeId}/`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(action),
-    });
-    return res.json();
+    return this.#patch(
+      `${browser}/${profile}/${target}/${nodeId}/`,
+      action
+    );
   }
 }
