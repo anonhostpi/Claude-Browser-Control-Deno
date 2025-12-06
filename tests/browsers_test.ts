@@ -6,7 +6,6 @@ import { assertEquals, assertExists } from "@std/assert";
 import {
   Browser,
   Type,
-  getDefaultBrowser,
   BROWSER_CONFIGS,
 } from "../src/browsers/mod.ts";
 
@@ -54,8 +53,8 @@ Deno.test("discovered browsers have required properties", async () => {
   }
 });
 
-Deno.test("getDefaultBrowser returns a browser or null", async () => {
-  const browser = await getDefaultBrowser();
+Deno.test("Browser.default returns a browser or null", async () => {
+  const browser = Browser.default;
 
   // May be null if no browsers installed, but if present should be valid
   if (browser) {

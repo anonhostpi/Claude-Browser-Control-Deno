@@ -3,7 +3,7 @@
  */
 
 import { assertEquals, assertExists } from "@std/assert";
-import { getDefaultBrowser } from "../src/browsers/mod.ts";
+import { Browser } from "../src/browsers/mod.ts";
 import {
   discoverProfiles,
   findProfile,
@@ -16,7 +16,7 @@ Deno.test("CLAUDE_PROFILE_NAME is 'Claude'", () => {
 });
 
 Deno.test("discoverProfiles returns array for valid browser", async () => {
-  const browser = await getDefaultBrowser();
+  const browser = Browser.default;
   if (!browser) {
     console.log("Skipping: no browser installed");
     return;
@@ -27,7 +27,7 @@ Deno.test("discoverProfiles returns array for valid browser", async () => {
 });
 
 Deno.test("discovered profiles have required properties", async () => {
-  const browser = await getDefaultBrowser();
+  const browser = Browser.default;
   if (!browser) {
     console.log("Skipping: no browser installed");
     return;
@@ -43,7 +43,7 @@ Deno.test("discovered profiles have required properties", async () => {
 });
 
 Deno.test("findProfile returns null for nonexistent profile", async () => {
-  const browser = await getDefaultBrowser();
+  const browser = Browser.default;
   if (!browser) {
     console.log("Skipping: no browser installed");
     return;
@@ -54,7 +54,7 @@ Deno.test("findProfile returns null for nonexistent profile", async () => {
 });
 
 Deno.test("getClaudeProfile returns profile with correct name", async () => {
-  const browser = await getDefaultBrowser();
+  const browser = Browser.default;
   if (!browser) {
     console.log("Skipping: no browser installed");
     return;

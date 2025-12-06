@@ -3,14 +3,7 @@
  * Scans the system for installed Chrome-based browsers
  */
 
-import { Browser, IBrowser } from "./browser.ts";
-import { Type } from "./metadata.ts";
 import { CLI } from "../cli/cli.ts";
-
-/** @deprecated Use Browsers.getDefault */
-export async function getDefaultBrowser(): Promise<IBrowser | null> {
-  return Browser.default;
-}
 
 /** @deprecated Use Browsers.resolvePath */
 export function resolvePath(path: string): string {
