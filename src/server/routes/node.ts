@@ -4,9 +4,9 @@
  */
 
 import { Hono } from "hono";
-import { connect } from "../../cdp/mod.ts";
 import { registry } from "../registry.ts";
 import { ContentfulStatusCode, StatusCode } from "hono/utils/http-status";
+import { CDP } from "../../cdp/mod.ts";
 
 export const nodeRoutes = new Hono();
 
@@ -36,7 +36,7 @@ nodeRoutes.on("HEAD", "/:browser/:profile/:target/:node", async (c) => {
     return c.body(null, result.status as StatusCode);
   }
 
-  const client = await connect({
+  const client = await CDP({
     port: result.instance.launched.debuggingPort,
     target: result.targetId,
   });
@@ -64,7 +64,7 @@ nodeRoutes.get("/:browser/:profile/:target/:node", async (c) => {
     return c.json({ error: result.error }, result.status as ContentfulStatusCode);
   }
 
-  const client = await connect({
+  const client = await CDP({
     port: result.instance.launched.debuggingPort,
     target: result.targetId,
   });
@@ -112,7 +112,7 @@ nodeRoutes.patch("/:browser/:profile/:target/:node", async (c) => {
 
   const body = await c.req.json();
 
-  const client = await connect({
+  const client = await CDP({
     port: result.instance.launched.debuggingPort,
     target: result.targetId,
   });

@@ -5,7 +5,7 @@
 
 import type { LaunchOptions, LaunchedBrowser } from "./types.ts";
 import { DEFAULT_DEBUGGING_PORT } from "./types.ts";
-import { getVersion } from "../cdp/mod.ts";
+import { CDP } from "../cdp/mod.ts";
 
 export class Launcher {
   /** Build command line arguments for browser launch */
@@ -72,7 +72,7 @@ export class Launcher {
   ): Promise<string> {
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       try {
-        const version = await getVersion({ port });
+        const version = await CDP.Version({ port });
         if (version.webSocketDebuggerUrl) {
           return version.webSocketDebuggerUrl;
         }

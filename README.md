@@ -38,7 +38,7 @@ import {
 
   getProfile,
   launchBrowser,
-  CDPClient,
+  CDP,
 } from "./src/mod.ts";
 
 // Discover browsers
@@ -59,7 +59,7 @@ const launched = await launchBrowser({
 });
 
 // Connect CDP client
-const cdp = await CDPClient.connect(launched.wsEndpoint);
+const cdp = await CDP(launched.wsEndpoint);
 
 // Navigate to a page
 await cdp.send("Page.navigate", { url: "https://example.com" });

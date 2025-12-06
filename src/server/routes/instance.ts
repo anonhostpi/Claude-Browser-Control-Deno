@@ -7,7 +7,7 @@ import { Hono } from "hono";
 import { Browser } from "../../browsers/mod.ts";
 import { getProfile } from "../../profiles/mod.ts";
 import { launchBrowser } from "../../launcher/mod.ts";
-import { listTargets, createTarget } from "../../cdp/mod.ts";
+import { CDP } from "../../cdp/mod.ts";
 import { registry } from "../registry.ts";
 
 export const instanceRoutes = new Hono();
@@ -33,7 +33,7 @@ instanceRoutes.get("/:browser/:profile", async (c) => {
     return c.json({ error: "Instance not running" }, 404);
   }
 
-  const targets = await listTargets({ port: instance.launched.debuggingPort });
+  const targets = await CDP.List({ port: instance.launched.debuggingPort });
 
   return c.json({
     browser: instance.browser.type,
@@ -65,8 +65,9 @@ instanceRoutes.put("/:browser/:profile", async (c) => {
       return c.json({ error: "Instance not running" }, 404);
     }
 
-    const target = await createTarget(body.url ?? "about:blank", {
+    const target = await CDP.New({
       port: instance.launched.debuggingPort,
+      url: body.url ?? "about:blank",
     });
 
     return c.json({
@@ -113,7 +114,7 @@ instanceRoutes.put("/:browser/:profile", async (c) => {
 
   return c.json({
     browser: browser.type,
-    profile: profile.displayName,
+    profile: profile.display,
     port: launched.debuggingPort,
     wsEndpoint: launched.wsEndpoint,
     created: true,

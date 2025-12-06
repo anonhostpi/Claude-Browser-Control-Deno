@@ -4,9 +4,10 @@
  */
 
 import { Hono } from "hono";
-import { listTargets, activateTarget, closeTarget, connect } from "../../cdp/mod.ts";
+import { CDP } from "../../cdp/mod.ts";
 import { registry } from "../registry.ts";
 import { ContentfulStatusCode, StatusCode } from "hono/utils/http-status";
+
 
 export const targetRoutes = new Hono();
 
@@ -19,7 +20,7 @@ async function getTarget(
   const instance = registry.get({ browser, profile });
   if (!instance) return { error: "Instance not running", status: 404 };
 
-  const targets = await listTargets({ port: instance.launched.debuggingPort });
+  const targets = await CDP.List({ port: instance.launched.debuggingPort });
   const target = targets.find((t) => t.id === targetId);
   if (!target) return { error: "Target not found", status: 404 };
 
@@ -79,7 +80,7 @@ targetRoutes.get("/:browser/:profile/:target", async (c) => {
   // Handle XPath query
   const xpath = c.req.query("xpath");
   if (xpath) {
-    const client = await connect({
+    const client = await CDP({
       port: result.instance.launched.debuggingPort,
       target: result.target.id,
     });
@@ -96,7 +97,7 @@ targetRoutes.get("/:browser/:profile/:target", async (c) => {
   // Handle CSS selector query
   const css = c.req.query("css");
   if (css) {
-    const client = await connect({
+    const client = await CDP({
       port: result.instance.launched.debuggingPort,
       target: result.target.id,
     });
@@ -131,8 +132,9 @@ targetRoutes.delete("/:browser/:profile/:target", async (c) => {
     return c.json({ error: result.error }, result.status as ContentfulStatusCode);
   }
 
-  await closeTarget(result.target.id, {
+  await CDP.Close({
     port: result.instance.launched.debuggingPort,
+    id: result.target.id,
   });
 
   return c.body(null, 204);
@@ -155,7 +157,7 @@ targetRoutes.post("/:browser/:profile/:target", async (c) => {
     return c.json({ error: "method required" }, 400);
   }
 
-  const client = await connect({
+  const client = await CDP({
     port: result.instance.launched.debuggingPort,
     target: result.target.id,
   });
@@ -187,7 +189,7 @@ targetRoutes.patch("/:browser/:profile/:target", async (c) => {
 
   const body = await c.req.json();
 
-  const client = await connect({
+  const client = await CDP({
     port: result.instance.launched.debuggingPort,
     target: result.target.id,
   });
@@ -210,8 +212,9 @@ targetRoutes.patch("/:browser/:profile/:target", async (c) => {
 
     // Activate target if requested
     if (body.activate) {
-      await activateTarget(result.target.id, {
+      await CDP.Activate({
         port: result.instance.launched.debuggingPort,
+        id: result.target.id,
       });
       return c.json({ activated: true });
     }

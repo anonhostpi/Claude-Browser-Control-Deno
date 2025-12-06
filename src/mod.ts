@@ -17,18 +17,17 @@ import { Browser } from "./browsers/mod.ts";
 import { CLI } from "./cli/cli.ts";
 import { getProfile, discoverProfiles, getClaudeProfile } from "./profiles/mod.ts";
 import { launchBrowser } from "./launcher/mod.ts";
-import { connect, connectToPage } from "./cdp/mod.ts";
+import { CDP } from "./cdp/mod.ts";
 
 export {
   Browser,
   // TODO: remove CLI from exports
   CLI,
+  CDP,
 
   detectOS,
   getProfile,
   discoverProfiles,
   getClaudeProfile,
   launchBrowser,
-  connect,
-  connectToPage,
 };
