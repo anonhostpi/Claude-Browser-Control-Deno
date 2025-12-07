@@ -63,6 +63,9 @@ export class Client {
     )).json();
   }
 
+  head(path?: string): Promise<void> {
+    return this.simple("HEAD", path) as Promise<void>;
+  }
   delete(path?: string): Promise<void> {
     return this.simple("DELETE", path) as Promise<void>;
   }
