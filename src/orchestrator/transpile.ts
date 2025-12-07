@@ -65,6 +65,7 @@ function generateTypeScript(contracts: LoadedContracts): string {
 
   for (const contract of contracts.contracts) {
     lines.push("  {");
+    lines.push(`    name: ${JSON.stringify(contract.name)},`);
     lines.push(`    path: ${JSON.stringify(contract.path)},`);
     lines.push(`    method: ${JSON.stringify(contract.method)},`);
     lines.push(`    description: ${JSON.stringify(contract.description)},`);
