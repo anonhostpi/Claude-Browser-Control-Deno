@@ -2,9 +2,9 @@ import { JSONSchema } from "json-schema-to-ts";
 export type Method = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "HEAD";
 
 export type EndpointContract<
-  RequestSchema extends JSONSchema,
-  ResponseSchema extends JSONSchema,
-  ErrorSchema extends JSONSchema,
+  RequestSchema extends JSONSchema = JSONSchema,
+  ResponseSchema extends JSONSchema = JSONSchema,
+  ErrorSchema extends JSONSchema = JSONSchema,
   Name extends string = string
 > = {
   name: Name; // unique identifier for filtering via `T extends { name: "..." }`
