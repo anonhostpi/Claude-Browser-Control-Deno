@@ -11,11 +11,11 @@ function _create<
     let response: unknown;
     switch (contract.method) {
       case "HEAD":
-      case "DELETE":
         await client.simple(contract.method, contract.path);
         response = undefined;
         break;
       case "GET":
+      case "DELETE":
         response = await client.simple(contract.method, contract.path);
         break;
       case "POST":
