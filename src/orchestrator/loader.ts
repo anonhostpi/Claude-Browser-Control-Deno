@@ -20,17 +20,15 @@
 import { parse as parseYaml } from "@std/yaml";
 import { parse as parseToml } from "@std/toml";
 import { dirname, toFileUrl } from "@std/path";
-import { EndpointContract, Method } from "./contract.ts";
-import { JSONSchema } from "json-schema-to-ts";
-
-export type ContractData = EndpointContract<JSONSchema, JSONSchema, JSONSchema>;
+import type { EndpointContract, Method } from "./contract.ts";
+import type { JSONSchema } from "json-schema-to-ts";
 
 /**
  * Contract file structure with optional base override
  */
 export interface ContractFile {
   base?: string;
-  contracts: ContractData[];
+  contracts: EndpointContract[];
 }
 
 /**
@@ -41,7 +39,7 @@ export interface LoadedContracts {
   base: string;
   /** Original base from contract file (undefined if not specified) */
   originalBase?: string;
-  contracts: ContractData[];
+  contracts: EndpointContract[];
 }
 
 /**
@@ -252,7 +250,7 @@ function extractContracts(data: unknown): { base?: string; contracts: unknown[] 
 /**
  * Parse contract data from a string in the specified format
  */
-export function parse(content: string, format: Format): ContractData[] {
+export function parse(content: string, format: Format): EndpointContract[] {
   const { contracts } = parseRaw(content, format);
   return contracts.map(validateContract);
 }
@@ -297,7 +295,7 @@ function resolveBase(base: string | undefined, contractPath: string): string {
  * Load contracts from a file (simple, without base resolution)
  * Supports !include (YAML) and $include (JSON/TOML) for importing other files.
  */
-export async function load(path: string, format?: Format): Promise<ContractData[]> {
+export async function load(path: string, format?: Format): Promise<EndpointContract[]> {
   const content = await Deno.readTextFile(path);
   const detectedFormat = format ?? detectFormat(path);
   const parsed = parseRawWithIncludes(content, detectedFormat);
@@ -310,7 +308,7 @@ export async function load(path: string, format?: Format): Promise<ContractData[
  * Load contracts from a file synchronously (simple, without base resolution)
  * Supports !include (YAML) and $include (JSON/TOML) for importing other files.
  */
-export function loadSync(path: string, format?: Format): ContractData[] {
+export function loadSync(path: string, format?: Format): EndpointContract[] {
   const content = Deno.readTextFileSync(path);
   const detectedFormat = format ?? detectFormat(path);
   const parsed = parseRawWithIncludes(content, detectedFormat);
@@ -365,7 +363,7 @@ const VALID_METHODS: Method[] = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD"
 /**
  * Validate and normalize a contract object
  */
-function validateContract(data: unknown): ContractData {
+function validateContract(data: unknown): EndpointContract {
   if (typeof data !== "object" || data === null) {
     throw new Error("Contract must be an object");
   }
