@@ -1,9 +1,24 @@
 /**
+ * ╔════════════════════════════════════════════════════════════════════════════╗
+ * ║  ⚠️  DEPRECATED - DO NOT USE                                               ║
+ * ║                                                                            ║
+ * ║  This module is LEGACY code kept for reference only.                       ║
+ * ║  Use src/client/ and src/orchestrator/ instead.                            ║
+ * ║                                                                            ║
+ * ║  Active modules:                                                           ║
+ * ║    - src/orchestrator/ (contract-driven REST framework)                    ║
+ * ║    - src/client/ (contract-driven browser control client)                  ║
+ * ║    - src/cli/ (CLI entry points)                                           ║
+ * ║    - src/mcp/ (Model Context Protocol server)                              ║
+ * ╚════════════════════════════════════════════════════════════════════════════╝
+ *
  * Browser Path Configurations
  * Defines executable and user data paths for each supported browser on each OS
+ * @deprecated
+ * @module
  */
 
-import type { Config } from "./metadata.ts";
+import type { Config } from "./metadata.deprecated.ts";
 
 // Helper to construct Windows paths
 const winProgFiles = "C:\\Program Files";

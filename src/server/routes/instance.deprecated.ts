@@ -1,14 +1,29 @@
 /**
+ * ╔════════════════════════════════════════════════════════════════════════════╗
+ * ║  ⚠️  DEPRECATED - DO NOT USE                                               ║
+ * ║                                                                            ║
+ * ║  This module is LEGACY code kept for reference only.                       ║
+ * ║  Use src/client/ and src/orchestrator/ instead.                            ║
+ * ║                                                                            ║
+ * ║  Active modules:                                                           ║
+ * ║    - src/orchestrator/ (contract-driven REST framework)                    ║
+ * ║    - src/client/ (contract-driven browser control client)                  ║
+ * ║    - src/cli/ (CLI entry points)                                           ║
+ * ║    - src/mcp/ (Model Context Protocol server)                              ║
+ * ╚════════════════════════════════════════════════════════════════════════════╝
+ *
  * Instance Routes
  * Browser instance lifecycle management
+ * @deprecated
+ * @module
  */
 
 import { Hono } from "hono";
-import { Browser } from "../../browsers/mod.ts";
-import { getProfile } from "../../profiles/mod.ts";
-import { launchBrowser } from "../../launcher/mod.ts";
-import { CDP } from "../../cdp/mod.ts";
-import { registry } from "../registry.ts";
+import { Browser } from "../../browsers/mod.deprecated.ts";
+import { getProfile } from "../../profiles/mod.deprecated.ts";
+import { launchBrowser } from "../../launcher/mod.deprecated.ts";
+import { CDP } from "../../cdp/mod.deprecated.ts";
+import { registry } from "../registry.deprecated.ts";
 
 export const instanceRoutes = new Hono();
 
@@ -70,12 +85,7 @@ instanceRoutes.put("/:browser/:profile", async (c) => {
       url: body.url ?? "about:blank",
     });
 
-    return c.json({
-      id: target.id,
-      type: target.type,
-      title: target.title,
-      url: target.url,
-    }, 201);
+    return c.json(target, 201);
   }
 
   // Handle instance creation (idempotent)

@@ -1,6 +1,21 @@
 /**
+ * ╔════════════════════════════════════════════════════════════════════════════╗
+ * ║  ⚠️  DEPRECATED - DO NOT USE                                               ║
+ * ║                                                                            ║
+ * ║  This module is LEGACY code kept for reference only.                       ║
+ * ║  Use src/client/ and src/orchestrator/ instead.                            ║
+ * ║                                                                            ║
+ * ║  Active modules:                                                           ║
+ * ║    - src/orchestrator/ (contract-driven REST framework)                    ║
+ * ║    - src/client/ (contract-driven browser control client)                  ║
+ * ║    - src/cli/ (CLI entry points)                                           ║
+ * ║    - src/mcp/ (Model Context Protocol server)                              ║
+ * ╚════════════════════════════════════════════════════════════════════════════╝
+ *
  * OS Detection Module
  * Identifies the host operating system and provides platform-specific paths
+ * @deprecated
+ * @module
  */
 
 export type Platform = "windows" | "darwin" | "linux";

@@ -1,11 +1,26 @@
 /**
+ * ╔════════════════════════════════════════════════════════════════════════════╗
+ * ║  ⚠️  DEPRECATED - DO NOT USE                                               ║
+ * ║                                                                            ║
+ * ║  This module is LEGACY code kept for reference only.                       ║
+ * ║  Use src/client/ and src/orchestrator/ instead.                            ║
+ * ║                                                                            ║
+ * ║  Active modules:                                                           ║
+ * ║    - src/orchestrator/ (contract-driven REST framework)                    ║
+ * ║    - src/client/ (contract-driven browser control client)                  ║
+ * ║    - src/cli/ (CLI entry points)                                           ║
+ * ║    - src/mcp/ (Model Context Protocol server)                              ║
+ * ╚════════════════════════════════════════════════════════════════════════════╝
+ *
  * Browser Launcher Module
  * Launches Chrome-based browsers with CDP debugging enabled
+ * @deprecated
+ * @module
  */
 
-import type { LaunchOptions, LaunchedBrowser } from "./types.ts";
-import { DEFAULT_DEBUGGING_PORT } from "./types.ts";
-import { CDP } from "../cdp/mod.ts";
+import type { LaunchOptions, LaunchedBrowser } from "./types.deprecated.ts";
+import { DEFAULT_DEBUGGING_PORT } from "./types.deprecated.ts";
+import { CDP } from "../cdp/mod.deprecated.ts";
 
 export class Launcher {
   /** Build command line arguments for browser launch */
@@ -92,11 +107,11 @@ export class Launcher {
     const debuggingPort = this.findPort(requestedPort);
     const args = this.buildArgs({ ...options, debuggingPort });
 
-    console.log(`Launching ${browser.name} with profile "${profile.displayName}"...`);
-    console.log(`Executable: ${browser.executablePath}`);
+    console.log(`Launching ${browser.name} with profile "${profile.display}"...`);
+    console.log(`Executable: ${browser.executable}`);
     console.log(`Debugging port: ${debuggingPort}`);
 
-    const command = new Deno.Command(browser.executablePath, {
+    const command = new Deno.Command(browser.executable, {
       args,
       stdout: "piped",
       stderr: "piped",

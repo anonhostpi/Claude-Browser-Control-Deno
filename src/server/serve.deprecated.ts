@@ -1,13 +1,28 @@
 /**
+ * ╔════════════════════════════════════════════════════════════════════════════╗
+ * ║  ⚠️  DEPRECATED - DO NOT USE                                               ║
+ * ║                                                                            ║
+ * ║  This module is LEGACY code kept for reference only.                       ║
+ * ║  Use src/client/ and src/orchestrator/ instead.                            ║
+ * ║                                                                            ║
+ * ║  Active modules:                                                           ║
+ * ║    - src/orchestrator/ (contract-driven REST framework)                    ║
+ * ║    - src/client/ (contract-driven browser control client)                  ║
+ * ║    - src/cli/ (CLI entry points)                                           ║
+ * ║    - src/mcp/ (Model Context Protocol server)                              ║
+ * ╚════════════════════════════════════════════════════════════════════════════╝
+ *
  * Server
  * HTTP server with parent PID lifecycle management
+ * @deprecated
+ * @module
  */
 
-import { create as routes } from "./routes/mod.ts";
+import { create as routes } from "./routes/mod.deprecated.ts";
 import { Hono } from "hono";
-import { registry } from "./registry.ts";
-import { DEFAULT_SERVER_PORT, DEFAULT_SERVER_HOSTNAME } from "./types.ts";
-import type { ServerConfig } from "./types.ts";
+import { registry } from "./registry.deprecated.ts";
+import { DEFAULT_SERVER_PORT, DEFAULT_SERVER_HOSTNAME } from "./types.deprecated.ts";
+import type { ServerConfig } from "./types.deprecated.ts";
 
 export class Server {
   static #instance: Server | null = null;

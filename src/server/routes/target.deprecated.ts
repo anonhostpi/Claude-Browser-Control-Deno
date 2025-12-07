@@ -1,11 +1,26 @@
 /**
+ * ╔════════════════════════════════════════════════════════════════════════════╗
+ * ║  ⚠️  DEPRECATED - DO NOT USE                                               ║
+ * ║                                                                            ║
+ * ║  This module is LEGACY code kept for reference only.                       ║
+ * ║  Use src/client/ and src/orchestrator/ instead.                            ║
+ * ║                                                                            ║
+ * ║  Active modules:                                                           ║
+ * ║    - src/orchestrator/ (contract-driven REST framework)                    ║
+ * ║    - src/client/ (contract-driven browser control client)                  ║
+ * ║    - src/cli/ (CLI entry points)                                           ║
+ * ║    - src/mcp/ (Model Context Protocol server)                              ║
+ * ╚════════════════════════════════════════════════════════════════════════════╝
+ *
  * Target Routes
  * Individual target (tab/page) management
+ * @deprecated
+ * @module
  */
 
 import { Hono } from "hono";
-import { CDP } from "../../cdp/mod.ts";
-import { registry } from "../registry.ts";
+import { CDP } from "../../cdp/mod.deprecated.ts";
+import { registry } from "../registry.deprecated.ts";
 import { ContentfulStatusCode, StatusCode } from "hono/utils/http-status";
 
 
@@ -86,9 +101,42 @@ targetRoutes.get("/:browser/:profile/:target", async (c) => {
     });
 
     try {
-      const { root } = await client.DOM.getDocument();
-      const { nodeIds } = await client.DOM.performSearch({ query: xpath });
-      return c.json({ nodes: nodeIds });
+      // Evaluate XPath and get array of nodes
+      const { result: evalResult } = await client.Runtime.evaluate({
+        expression: `(() => {
+          const r = document.evaluate(${JSON.stringify(xpath)}, document, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
+          const nodes = [];
+          for (let i = 0; i < r.snapshotLength; i++) {
+            nodes.push(r.snapshotItem(i));
+          }
+          return nodes;
+        })()`,
+        returnByValue: false,
+      });
+
+      if (!evalResult.objectId) {
+        return c.json({ nodes: [] });
+      }
+
+      // Get properties of the array
+      const { result: props } = await client.Runtime.getProperties({
+        objectId: evalResult.objectId,
+      });
+
+      const nodes = [];
+
+      // Convert each objectId to nodeId and get node info
+      for (const prop of props) {
+        if (!prop.enumerable) continue;
+        const value = prop.value;
+        if (value?.objectId) {
+          const { nodeId } = await client.DOM.requestNode({ objectId: value.objectId });
+          const { node } = await client.DOM.describeNode({ nodeId });
+          nodes.push({ nodeId, nodeName: node.nodeName, nodeType: node.nodeType });
+        }
+      }
+
+      return c.json({ nodes });
     } finally {
       await client.close();
     }
@@ -104,20 +152,21 @@ targetRoutes.get("/:browser/:profile/:target", async (c) => {
 
     try {
       const { root } = await client.DOM.getDocument();
-      const { nodeId } = await client.DOM.querySelector({ nodeId: root.nodeId, selector: css });
       const { nodeIds } = await client.DOM.querySelectorAll({ nodeId: root.nodeId, selector: css });
-      return c.json({ nodes: nodeIds });
+
+      const nodes = [];
+      for (const nodeId of nodeIds) {
+        const { node } = await client.DOM.describeNode({ nodeId });
+        nodes.push({ nodeId, nodeName: node.nodeName, nodeType: node.nodeType });
+      }
+
+      return c.json({ nodes });
     } finally {
       await client.close();
     }
   }
 
-  return c.json({
-    id: result.target.id,
-    type: result.target.type,
-    title: result.target.title,
-    url: result.target.url,
-  });
+  return c.json(result.target);
 });
 
 /** Close target */
@@ -197,8 +246,8 @@ targetRoutes.patch("/:browser/:profile/:target", async (c) => {
   try {
     // Navigate if URL provided
     if (body.url) {
-      await client.Page.navigate({ url: body.url });
-      return c.json({ url: body.url });
+      const navigated = await client.Page.navigate({ url: body.url });
+      return c.json(Object.assign({ url: body.url }, navigated));
     }
 
     // Execute script if provided
@@ -207,7 +256,7 @@ targetRoutes.patch("/:browser/:profile/:target", async (c) => {
         expression: body.script,
         returnByValue: true,
       });
-      return c.json({ result: evalResult.result });
+      return c.json(evalResult);
     }
 
     // Activate target if requested

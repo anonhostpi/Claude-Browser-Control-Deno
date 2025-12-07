@@ -1,12 +1,27 @@
 /**
+ * ╔════════════════════════════════════════════════════════════════════════════╗
+ * ║  ⚠️  DEPRECATED - DO NOT USE                                               ║
+ * ║                                                                            ║
+ * ║  This module is LEGACY code kept for reference only.                       ║
+ * ║  Use src/client/ and src/orchestrator/ instead.                            ║
+ * ║                                                                            ║
+ * ║  Active modules:                                                           ║
+ * ║    - src/orchestrator/ (contract-driven REST framework)                    ║
+ * ║    - src/client/ (contract-driven browser control client)                  ║
+ * ║    - src/cli/ (CLI entry points)                                           ║
+ * ║    - src/mcp/ (Model Context Protocol server)                              ║
+ * ╚════════════════════════════════════════════════════════════════════════════╝
+ *
  * Profile Discovery Module
  * Discovers and manages browser profiles
+ * @deprecated
+ * @module
  */
 
 import { join } from "https://deno.land/std@0.224.0/path/mod.ts";
-import type { IBrowser } from "../browsers/mod.ts";
-import type { ProfileInfo, ProfilePreferences } from "./types.ts";
-import { CLAUDE_PROFILE_NAME } from "./types.ts";
+import type { IBrowser } from "../browsers/mod.deprecated.ts";
+import type { ProfileInfo, ProfilePreferences } from "./types.deprecated.ts";
+import { CLAUDE_PROFILE_NAME } from "./types.deprecated.ts";
 
 export class Profiles {
   /** Read the Preferences file from a profile directory */

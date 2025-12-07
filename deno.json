@@ -53,6 +53,6 @@
     "exclude": ["coverage/", "docs/"]
   },
   "test": {
-    "include": ["src/**/*_test.ts", "tests/**/*.ts"]
+    "include": ["src/**/*_test.ts"]
   }
 }

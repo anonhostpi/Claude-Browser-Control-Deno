@@ -1,12 +1,27 @@
 /**
+ * ╔════════════════════════════════════════════════════════════════════════════╗
+ * ║  ⚠️  DEPRECATED - DO NOT USE                                               ║
+ * ║                                                                            ║
+ * ║  This module is LEGACY code kept for reference only.                       ║
+ * ║  Use src/client/ and src/orchestrator/ instead.                            ║
+ * ║                                                                            ║
+ * ║  Active modules:                                                           ║
+ * ║    - src/orchestrator/ (contract-driven REST framework)                    ║
+ * ║    - src/client/ (contract-driven browser control client)                  ║
+ * ║    - src/cli/ (CLI entry points)                                           ║
+ * ║    - src/mcp/ (Model Context Protocol server)                              ║
+ * ╚════════════════════════════════════════════════════════════════════════════╝
+ *
  * Node Routes
  * Individual DOM node management
+ * @deprecated
+ * @module
  */
 
 import { Hono } from "hono";
-import { registry } from "../registry.ts";
+import { registry } from "../registry.deprecated.ts";
 import { ContentfulStatusCode, StatusCode } from "hono/utils/http-status";
-import { CDP } from "../../cdp/mod.ts";
+import { CDP } from "../../cdp/mod.deprecated.ts";
 
 export const nodeRoutes = new Hono();
 
@@ -73,12 +88,12 @@ nodeRoutes.get("/:browser/:profile/:target/:node", async (c) => {
     // Return children if requested
     if (c.req.query("children") !== undefined) {
       const { node } = await client.DOM.describeNode({ nodeId: result.nodeId, depth: 1 });
-      const children = node.children?.map((child: { nodeId: number; nodeName: string; nodeType: number }) => ({
+      const nodes = node.children?.map((child: { nodeId: number; nodeName: string; nodeType: number }) => ({
         nodeId: child.nodeId,
         nodeName: child.nodeName,
         nodeType: child.nodeType,
       })) ?? [];
-      return c.json({ children });
+      return c.json({ nodes });
     }
 
     // Return node info

@@ -1,10 +1,27 @@
+/**
+ * ╔════════════════════════════════════════════════════════════════════════════╗
+ * ║  ⚠️  DEPRECATED - DO NOT USE                                               ║
+ * ║                                                                            ║
+ * ║  This module is LEGACY code kept for reference only.                       ║
+ * ║  Use src/client/ and src/orchestrator/ instead.                            ║
+ * ║                                                                            ║
+ * ║  Active modules:                                                           ║
+ * ║    - src/orchestrator/ (contract-driven REST framework)                    ║
+ * ║    - src/client/ (contract-driven browser control client)                  ║
+ * ║    - src/cli/ (CLI entry points)                                           ║
+ * ║    - src/mcp/ (Model Context Protocol server)                              ║
+ * ╚════════════════════════════════════════════════════════════════════════════╝
+ * @deprecated
+ * @module
+ */
+
 import {
   Type,
   Config
-} from "./metadata.ts";
+} from "./metadata.deprecated.ts";
 
-import { BROWSER_CONFIGS } from "./configs.ts";
-import { OS } from "../os/mod.ts";
+import { BROWSER_CONFIGS } from "./configs.deprecated.ts";
+import { OS } from "../os/mod.deprecated.ts";
 import { CLI } from "../cli/cli.ts";
 
 export interface IBrowser {
