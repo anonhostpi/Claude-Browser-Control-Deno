@@ -1,11 +1,34 @@
 import { Method } from "../contract.ts";
 
-export class Client {
-  constructor(url: string) {
-    this.url = url;
+export interface IClient {
+  readonly url: string;
+}
+
+export class Client implements IClient {
+  constructor(url: string | IClient, path?: string) {
+    if (typeof url === "string") {
+      this.#url = url;
+    } else {
+      this.#parent = url;
+      this.#path = path ?? "";
+    }
   }
 
-  url: string;
+  #url?: string;
+  #parent?: IClient;
+  #path?: string;
+
+  get url(): string {
+    if (this.#url) return this.#url;
+    const parentUrl = this.#parent!.url;
+    const base = parentUrl.endsWith("/") ? parentUrl : parentUrl + "/";
+    return this.#path ? new URL(this.#path, base).href : parentUrl;
+  }
+  set url(value: string) {
+    this.#url = value;
+    this.#parent = undefined;
+    this.#path = undefined;
+  }
 
   #full(path?: string): string {
     if (!path) return this.url;
