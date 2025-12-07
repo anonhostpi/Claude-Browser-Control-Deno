@@ -20,7 +20,7 @@
 import { parse as parseYaml } from "@std/yaml";
 import { parse as parseToml } from "@std/toml";
 import { dirname, toFileUrl } from "@std/path";
-import type { EndpointContract, Method } from "./contract.ts";
+import type { EndpointContract, MCPToolConfig, Method } from "./contract.ts";
 import type { JSONSchema } from "json-schema-to-ts";
 
 /**
@@ -399,5 +399,6 @@ function validateContract(data: unknown): EndpointContract {
     response: obj.response as JSONSchema,
     request: obj.request as JSONSchema | undefined,
     error: obj.error as JSONSchema | undefined,
+    mcp: obj.mcp as MCPToolConfig | undefined,
   };
 }

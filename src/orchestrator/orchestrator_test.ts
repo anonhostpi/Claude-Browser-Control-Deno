@@ -11,13 +11,14 @@
 
 import { assertEquals, assertExists, assertThrows } from "@std/assert";
 import { Client } from "./client/client.ts";
-import { create as createClientUtility } from "./client/utility.ts";
+import { create as createClientUtility, type ContractByName } from "./client/utility.ts";
 import { build as buildRoutes } from "./server/builder.ts";
 import { EndpointContract } from "./contract.ts";
-import { JSONSchema } from "json-schema-to-ts";
+import { JSONSchema, FromSchema } from "json-schema-to-ts";
 import { toFileUrl } from "@std/path";
 import { parse, detectFormat, load, loadSync, loadWithBase, getDefaultBase } from "./loader.ts";
 import { transpile, transpileSync, getDefaultOutputPath } from "./transpile.ts";
+import { contracts } from "./contracts/api.ts";
 
 // ============================================================================
 // Test Fixtures
@@ -248,6 +249,149 @@ Deno.test("Client: alive with specific code", async () => {
   }
 });
 
+Deno.test("Client: parent URL propagation", () => {
+  // Create a parent client
+  const parent = new Client("http://localhost:9333");
+
+  // Create child with path
+  const child = new Client(parent, "chrome");
+  assertEquals(child.url, "http://localhost:9333/chrome");
+
+  // Create grandchild
+  const grandchild = new Client(child, "default");
+  assertEquals(grandchild.url, "http://localhost:9333/chrome/default");
+
+  // Update parent URL - children should reflect the change
+  parent.url = "http://localhost:8080";
+  assertEquals(parent.url, "http://localhost:8080");
+  assertEquals(child.url, "http://localhost:8080/chrome");
+  assertEquals(grandchild.url, "http://localhost:8080/chrome/default");
+});
+
+Deno.test("Client: url setter breaks parent chain", () => {
+  const parent = new Client("http://localhost:9333");
+  const child = new Client(parent, "chrome");
+
+  assertEquals(child.url, "http://localhost:9333/chrome");
+
+  // Setting url directly breaks parent chain
+  child.url = "http://different:8080/custom";
+  assertEquals(child.url, "http://different:8080/custom");
+
+  // Parent changes no longer affect child
+  parent.url = "http://localhost:9999";
+  assertEquals(child.url, "http://different:8080/custom");
+});
+
+Deno.test("Client: empty path inherits parent URL", () => {
+  const parent = new Client("http://localhost:9333/api");
+  const child = new Client(parent, "");
+
+  assertEquals(child.url, "http://localhost:9333/api");
+});
+
+Deno.test("Client: PUT with body", async () => {
+  const controller = new AbortController();
+  let receivedBody: unknown;
+  let receivedMethod = "";
+  const server = Deno.serve(
+    { port: TEST_PORT, signal: controller.signal, onListen: () => {} },
+    async (req) => {
+      receivedMethod = req.method;
+      receivedBody = await req.json();
+      return new Response(JSON.stringify({ updated: true }), {
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+  );
+
+  try {
+    const client = new Client(TEST_URL);
+    const result = await client.put({ name: "updated" });
+    assertEquals(receivedMethod, "PUT");
+    assertEquals(receivedBody, { name: "updated" });
+    assertEquals(result, { updated: true });
+  } finally {
+    controller.abort();
+    await server.finished;
+  }
+});
+
+Deno.test("Client: PUT with path and body", async () => {
+  const controller = new AbortController();
+  let receivedPath = "";
+  let receivedBody: unknown;
+  const server = Deno.serve(
+    { port: TEST_PORT, signal: controller.signal, onListen: () => {} },
+    async (req) => {
+      receivedPath = new URL(req.url).pathname;
+      receivedBody = await req.json();
+      return new Response(JSON.stringify({ ok: true }), {
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+  );
+
+  try {
+    const client = new Client(TEST_URL);
+    await client.put("resource/123", { value: 42 });
+    assertEquals(receivedPath, "/resource/123");
+    assertEquals(receivedBody, { value: 42 });
+  } finally {
+    controller.abort();
+    await server.finished;
+  }
+});
+
+Deno.test("Client: PATCH with body", async () => {
+  const controller = new AbortController();
+  let receivedMethod = "";
+  let receivedBody: unknown;
+  const server = Deno.serve(
+    { port: TEST_PORT, signal: controller.signal, onListen: () => {} },
+    async (req) => {
+      receivedMethod = req.method;
+      receivedBody = await req.json();
+      return new Response(JSON.stringify({ patched: true }), {
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+  );
+
+  try {
+    const client = new Client(TEST_URL);
+    const result = await client.patch({ delta: "change" });
+    assertEquals(receivedMethod, "PATCH");
+    assertEquals(receivedBody, { delta: "change" });
+    assertEquals(result, { patched: true });
+  } finally {
+    controller.abort();
+    await server.finished;
+  }
+});
+
+Deno.test("Client: HEAD request", async () => {
+  const controller = new AbortController();
+  let receivedMethod = "";
+  const server = Deno.serve(
+    { port: TEST_PORT, signal: controller.signal, onListen: () => {} },
+    (req) => {
+      receivedMethod = req.method;
+      return new Response(null, { status: 200 });
+    }
+  );
+
+  try {
+    const client = new Client(TEST_URL);
+    const result = await client.head("check");
+    assertEquals(receivedMethod, "HEAD");
+    assertEquals(result, undefined);
+  } finally {
+    controller.abort();
+    await server.finished;
+  }
+});
+
 // ============================================================================
 // Client Utility Tests
 // ============================================================================
@@ -337,6 +481,217 @@ Deno.test("createClientUtility: sends request body for POST", async () => {
     await utility(client, { name: "test-item" });
 
     assertEquals(receivedBody, { name: "test-item" });
+  } finally {
+    controller.abort();
+    await server.finished;
+  }
+});
+
+Deno.test("createClientUtility: HEAD returns undefined", async () => {
+  const controller = new AbortController();
+  let receivedMethod = "";
+
+  const server = Deno.serve(
+    { port: TEST_PORT, signal: controller.signal, onListen: () => {} },
+    (req) => {
+      receivedMethod = req.method;
+      return new Response(null, { status: 200 });
+    }
+  );
+
+  try {
+    const contract: EndpointContract<JSONSchema, JSONSchema, JSONSchema> = {
+      name: "healthCheck",
+      path: "/health",
+      method: "HEAD",
+      description: "Health check",
+      response: { type: "null" } as const,
+      module: "",
+    };
+
+    const utility = createClientUtility(contract);
+    const client = new Client(TEST_URL);
+    const result = await utility(client);
+
+    assertEquals(receivedMethod, "HEAD");
+    assertEquals(result, undefined);
+  } finally {
+    controller.abort();
+    await server.finished;
+  }
+});
+
+Deno.test("createClientUtility: DELETE returns response body", async () => {
+  const controller = new AbortController();
+  let receivedMethod = "";
+
+  const server = Deno.serve(
+    { port: TEST_PORT, signal: controller.signal, onListen: () => {} },
+    (req) => {
+      receivedMethod = req.method;
+      return new Response(JSON.stringify({ deleted: true, count: 5 }), {
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+  );
+
+  try {
+    const contract: EndpointContract<JSONSchema, JSONSchema, JSONSchema> = {
+      name: "deleteItems",
+      path: "/items",
+      method: "DELETE",
+      description: "Delete items",
+      response: {
+        type: "object",
+        properties: {
+          deleted: { type: "boolean" },
+          count: { type: "number" },
+        },
+      } as const,
+      module: "",
+    };
+
+    const utility = createClientUtility(contract);
+    const client = new Client(TEST_URL);
+    const result = await utility(client);
+
+    assertEquals(receivedMethod, "DELETE");
+    assertEquals(result, { deleted: true, count: 5 });
+  } finally {
+    controller.abort();
+    await server.finished;
+  }
+});
+
+Deno.test("createClientUtility: PUT sends body and returns response", async () => {
+  const controller = new AbortController();
+  let receivedMethod = "";
+  let receivedBody: unknown;
+
+  const server = Deno.serve(
+    { port: TEST_PORT, signal: controller.signal, onListen: () => {} },
+    async (req) => {
+      receivedMethod = req.method;
+      receivedBody = await req.json();
+      return new Response(JSON.stringify({ replaced: true }), {
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+  );
+
+  try {
+    const contract: EndpointContract<JSONSchema, JSONSchema, JSONSchema> = {
+      name: "replaceItem",
+      path: "/item",
+      method: "PUT",
+      description: "Replace item",
+      request: {
+        type: "object",
+        properties: { content: { type: "string" } },
+      } as const,
+      response: {
+        type: "object",
+        properties: { replaced: { type: "boolean" } },
+      } as const,
+      module: "",
+    };
+
+    const utility = createClientUtility(contract);
+    const client = new Client(TEST_URL);
+    const result = await utility(client, { content: "new content" });
+
+    assertEquals(receivedMethod, "PUT");
+    assertEquals(receivedBody, { content: "new content" });
+    assertEquals(result, { replaced: true });
+  } finally {
+    controller.abort();
+    await server.finished;
+  }
+});
+
+Deno.test("createClientUtility: PATCH sends body and returns response", async () => {
+  const controller = new AbortController();
+  let receivedMethod = "";
+  let receivedBody: unknown;
+
+  const server = Deno.serve(
+    { port: TEST_PORT, signal: controller.signal, onListen: () => {} },
+    async (req) => {
+      receivedMethod = req.method;
+      receivedBody = await req.json();
+      return new Response(JSON.stringify({ patched: true }), {
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+  );
+
+  try {
+    const contract: EndpointContract<JSONSchema, JSONSchema, JSONSchema> = {
+      name: "patchItem",
+      path: "/item",
+      method: "PATCH",
+      description: "Patch item",
+      request: {
+        type: "object",
+        properties: { delta: { type: "string" } },
+      } as const,
+      response: {
+        type: "object",
+        properties: { patched: { type: "boolean" } },
+      } as const,
+      module: "",
+    };
+
+    const utility = createClientUtility(contract);
+    const client = new Client(TEST_URL);
+    const result = await utility(client, { delta: "change" });
+
+    assertEquals(receivedMethod, "PATCH");
+    assertEquals(receivedBody, { delta: "change" });
+    assertEquals(result, { patched: true });
+  } finally {
+    controller.abort();
+    await server.finished;
+  }
+});
+
+Deno.test("createClientUtility: POST without request schema sends no body", async () => {
+  const controller = new AbortController();
+  let receivedMethod = "";
+  let receivedContentType: string | null = null;
+
+  const server = Deno.serve(
+    { port: TEST_PORT, signal: controller.signal, onListen: () => {} },
+    (req) => {
+      receivedMethod = req.method;
+      receivedContentType = req.headers.get("content-type");
+      return new Response(JSON.stringify({ triggered: true }), {
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+  );
+
+  try {
+    const contract: EndpointContract<JSONSchema, JSONSchema, JSONSchema> = {
+      name: "triggerAction",
+      path: "/trigger",
+      method: "POST",
+      description: "Trigger an action without body",
+      // No request schema
+      response: {
+        type: "object",
+        properties: { triggered: { type: "boolean" } },
+      } as const,
+      module: "",
+    };
+
+    const utility = createClientUtility(contract);
+    const client = new Client(TEST_URL);
+    const result = await utility(client);
+
+    assertEquals(receivedMethod, "POST");
+    assertEquals(receivedContentType, null); // No body means no content-type
+    assertEquals(result, { triggered: true });
   } finally {
     controller.abort();
     await server.finished;
@@ -1788,6 +2143,24 @@ contracts:
   };
   await Deno.writeTextFile(denoJsonFile, JSON.stringify(denoJson, null, 2));
 
+  // Create client directory with mock utility.ts for the generated import
+  // The generated import is "../client/utility.ts" relative to contracts.ts,
+  // so client/ needs to be a sibling of the temp directory
+  const parentDir = tempDir.substring(0, tempDir.lastIndexOf("/") > 0 ? tempDir.lastIndexOf("/") : tempDir.lastIndexOf("\\"));
+  const clientDir = `${parentDir}/client`;
+  await Deno.mkdir(clientDir, { recursive: true });
+  const utilityCode = `
+// Mock utility types for type checking test
+export type ContractByName<T extends readonly unknown[], N extends string> =
+  Extract<T[number], { name: N }>;
+
+// Mock create function for miniclient factory
+export function create(_contract: unknown) {
+  return () => {};
+}
+`;
+  await Deno.writeTextFile(`${clientDir}/utility.ts`, utilityCode);
+
   try {
     // Transpile to TypeScript
     await transpile(sourceFile, { output: contractsFile, format: "ts" });
@@ -1833,6 +2206,12 @@ export { validResponse };
     assertEquals(code, 0);
   } finally {
     await Deno.remove(tempDir, { recursive: true });
+    // Clean up client directory in parent temp folder
+    try {
+      await Deno.remove(clientDir, { recursive: true });
+    } catch {
+      // Ignore if already removed
+    }
   }
 });
 
@@ -1923,4 +2302,78 @@ export default (input: { message: string }) => ({
   } finally {
     await Deno.remove(tempDir, { recursive: true });
   }
+});
+
+// ============================================================================
+// Regression Tests
+// ============================================================================
+
+Deno.test("Client: DELETE returns response body when present", async () => {
+  // Regression test: DELETE requests can have response bodies
+  // Previously, DELETE was incorrectly grouped with HEAD to return undefined
+  const controller = new AbortController();
+  const server = Deno.serve(
+    { port: TEST_PORT, signal: controller.signal, onListen: () => {} },
+    () => new Response(JSON.stringify({ deleted: true, id: "123" }), {
+      headers: { "Content-Type": "application/json" },
+    })
+  );
+
+  try {
+    const client = new Client(TEST_URL);
+    const result = await client.simple("DELETE", "resource/123");
+    assertEquals(result, { deleted: true, id: "123" });
+  } finally {
+    controller.abort();
+    await server.finished;
+  }
+});
+
+// ============================================================================
+// Type Utility Tests
+// ============================================================================
+
+Deno.test("ContractByName: extracts correct contract type by name", () => {
+  // This test verifies that ContractByName correctly extracts a contract by its name
+  // using TypeScript's type filtering capabilities
+
+  // Extract the target:info contract type
+  type TargetInfoContract = ContractByName<typeof contracts, "target:info">;
+
+  // Find the contract at runtime
+  const targetInfoContract = contracts.find(
+    (c): c is TargetInfoContract => c.name === "target:info"
+  )!;
+
+  // Verify the contract has the expected properties
+  assertEquals(targetInfoContract.name, "target:info");
+  assertEquals(targetInfoContract.path, "/:endpoint/:context/:target");
+  assertEquals(targetInfoContract.method, "GET");
+
+  // Verify the response schema is present and has expected properties
+  assertExists(targetInfoContract.response);
+  assertEquals(targetInfoContract.response.type, "object");
+
+  // Type-level verification: The extracted type should have the correct shape
+  // This is a compile-time check - if ContractByName doesn't work, this won't compile
+  const _nameCheck: TargetInfoContract["name"] = "target:info";
+  const _methodCheck: TargetInfoContract["method"] = "GET";
+
+  // Verify we can use FromSchema with the extracted contract's schemas
+  type TargetInfoResponse = FromSchema<TargetInfoContract["response"]>;
+
+  // Type assertion: The response type should have the expected properties
+  // This validates that the full type chain works: contracts -> ContractByName -> FromSchema
+  const _responseShapeCheck: TargetInfoResponse = {
+    id: "test-id",
+    type: "page",
+    title: "Test Page",
+    url: "https://example.com",
+  };
+
+  // Verify the shape at runtime too
+  assertExists(_responseShapeCheck.id);
+  assertExists(_responseShapeCheck.type);
+  assertExists(_responseShapeCheck.title);
+  assertExists(_responseShapeCheck.url);
 });

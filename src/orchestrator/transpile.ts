@@ -4,12 +4,27 @@
  * Provides functions to:
  * - Convert contracts from YAML/TOML to JSON
  * - Generate TypeScript modules with full type inference
+ * - Generate MCP tool schemas for Model Context Protocol integration
  * - Resolve all $include directives
  * - Output a single flattened file
  */
 
 import { loadWithBase, loadWithBaseSync, type LoadedContracts } from "./loader.ts";
+import type { EndpointContract } from "./contract.ts";
 import { resolve } from "@std/path";
+
+/**
+ * MCP Tool schema as defined by the Model Context Protocol
+ */
+export interface MCPTool {
+  name: string;
+  description: string;
+  inputSchema: {
+    type: "object";
+    properties?: Record<string, unknown>;
+    required?: string[];
+  };
+}
 
 /**
  * Transpile options
@@ -35,22 +50,152 @@ export interface TranspileResult {
   outputPath?: string;
   /** For backwards compatibility */
   json: string;
+  /** MCP tool schemas generated from contracts with mcp config */
+  mcpTools: MCPTool[];
+}
+
+/**
+ * Generate MCP tool schemas from contracts.
+ * Only generates tools for contracts that have mcp config (or all if mcp.enabled !== false).
+ */
+function generateMCPTools(contracts: EndpointContract[]): MCPTool[] {
+  const tools: MCPTool[] = [];
+
+  for (const contract of contracts) {
+    // Skip contracts without mcp config or with mcp.enabled === false
+    if (contract.mcp?.enabled === false) continue;
+
+    // Generate tool name: use mcp.tool if specified, otherwise convert contract name
+    // e.g., "target:control" -> "target_control"
+    const toolName = contract.mcp?.tool ?? contract.name.replace(/:/g, "_");
+
+    // Use mcp.description if specified, otherwise use contract description
+    const description = contract.mcp?.description ?? contract.description;
+
+    // Build input schema from request schema
+    // MCP tools use JSON Schema for input validation
+    const inputSchema: MCPTool["inputSchema"] = {
+      type: "object" as const,
+    };
+
+    if (contract.request && typeof contract.request === "object") {
+      const req = contract.request as Record<string, unknown>;
+
+      // Add path parameters as additional properties
+      const pathParams = contract.path.match(/:(\w+)/g)?.map((p) => p.slice(1)) ?? [];
+
+      // Merge path params into properties
+      const properties: Record<string, unknown> = {};
+      for (const param of pathParams) {
+        properties[param] = { type: "string", description: `Path parameter: ${param}` };
+      }
+
+      // Add request body properties
+      if (req.properties && typeof req.properties === "object") {
+        Object.assign(properties, req.properties);
+      }
+
+      if (Object.keys(properties).length > 0) {
+        inputSchema.properties = properties;
+      }
+
+      // Combine required fields
+      const required: string[] = [...pathParams]; // Path params are always required
+      if (Array.isArray(req.required)) {
+        required.push(...req.required.filter((r): r is string => typeof r === "string"));
+      }
+      if (required.length > 0) {
+        inputSchema.required = required;
+      }
+    } else {
+      // No request body, but still need path parameters
+      const pathParams = contract.path.match(/:(\w+)/g)?.map((p) => p.slice(1)) ?? [];
+      if (pathParams.length > 0) {
+        inputSchema.properties = {};
+        for (const param of pathParams) {
+          inputSchema.properties[param] = { type: "string", description: `Path parameter: ${param}` };
+        }
+        inputSchema.required = pathParams;
+      }
+    }
+
+    tools.push({
+      name: toolName,
+      description,
+      inputSchema,
+    });
+  }
+
+  return tools;
+}
+
+/**
+ * Parse contract name into namespace and action parts.
+ * e.g., "target:info" -> { namespace: "Target", action: "Info" }
+ *       "root:killAll" -> { namespace: "Root", action: "KillAll" }
+ */
+function parseContractName(name: string): { namespace: string; action: string } {
+  const parts = name.split(":");
+  if (parts.length !== 2) {
+    // Fallback for names without colon
+    return { namespace: "Default", action: toPascalCase(name) };
+  }
+  return {
+    namespace: toPascalCase(parts[0]),
+    action: toPascalCase(parts[1]),
+  };
+}
+
+/**
+ * Convert a string to PascalCase.
+ * e.g., "killAll" -> "KillAll", "info" -> "Info"
+ */
+function toPascalCase(name: string): string {
+  return name
+    .split(/[\-_]/)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join("");
+}
+
+/**
+ * Group contracts by their namespace.
+ */
+function groupByNamespace(
+  contractList: EndpointContract[]
+): Map<string, { contract: EndpointContract; action: string }[]> {
+  const groups = new Map<string, { contract: EndpointContract; action: string }[]>();
+
+  for (const contract of contractList) {
+    const { namespace, action } = parseContractName(contract.name);
+    if (!groups.has(namespace)) {
+      groups.set(namespace, []);
+    }
+    groups.get(namespace)!.push({ contract, action });
+  }
+
+  return groups;
 }
 
 /**
  * Generate TypeScript module content from contracts.
- * The generated module exports contracts with `as const` for full type inference.
+ * The generated module exports contracts with `as const` for full type inference,
+ * plus namespaced types for easy access (e.g., Target.InfoResponse, Node.InteractRequest).
  */
 function generateTypeScript(contracts: LoadedContracts): string {
   const lines: string[] = [
+    "// deno-lint-ignore-file no-namespace",
     "/**",
     " * Auto-generated contract definitions.",
     " * DO NOT EDIT - Generated by orchestrator/transpile.ts",
     " *",
-    " * Use with json-schema-to-ts for full type inference:",
-    " *   import { FromSchema } from 'json-schema-to-ts';",
-    " *   type Response = FromSchema<typeof contracts[0]['response']>;",
+    " * Exports:",
+    " *   - contracts: readonly array of all contracts",
+    " *   - Namespaced types: e.g., Target.InfoContract, Target.InfoResponse",
     " */",
+    "",
+    "import type { FromSchema } from \"json-schema-to-ts\";",
+    "import type { ContractByName } from \"../client/utility.ts\";",
+    "import { create as _create } from \"../client/utility.ts\";",
     "",
   ];
 
@@ -77,6 +222,9 @@ function generateTypeScript(contracts: LoadedContracts): string {
     if (contract.error) {
       lines.push(`    error: ${JSON.stringify(contract.error, null, 2).split("\n").join("\n    ")},`);
     }
+    if (contract.mcp) {
+      lines.push(`    mcp: ${JSON.stringify(contract.mcp, null, 2).split("\n").join("\n    ")},`);
+    }
     lines.push("  } as const,");
   }
 
@@ -85,6 +233,56 @@ function generateTypeScript(contracts: LoadedContracts): string {
   lines.push("export type Contracts = typeof contracts;");
   lines.push("export type Contract = Contracts[number];");
   lines.push("");
+
+  // Group contracts by namespace and generate namespaced types
+  const groups = groupByNamespace(contracts.contracts);
+
+  for (const [namespace, items] of groups) {
+    lines.push(`// ${namespace} types and contracts`);
+    lines.push(`export namespace ${namespace} {`);
+
+    // First generate all type aliases
+    for (const { contract, action } of items) {
+      // Contract type alias
+      lines.push(`  export type ${action}Contract = ContractByName<Contracts, "${contract.name}">;`);
+
+      // Response type (if not null)
+      if (contract.response && (contract.response as { type?: string }).type !== "null") {
+        lines.push(`  export type ${action}Response = FromSchema<${action}Contract["response"]>;`);
+      }
+
+      // Request type (if present)
+      if (contract.request) {
+        lines.push(`  export type ${action}Request = FromSchema<${action}Contract["request"]>;`);
+      }
+    }
+
+    // Then generate contract instances
+    lines.push("");
+    lines.push("  // Contract instances");
+    for (const { contract, action } of items) {
+      const lowerAction = action.charAt(0).toLowerCase() + action.slice(1);
+      lines.push(
+        `  export const ${lowerAction} = contracts.find((c): c is ${action}Contract => c.name === "${contract.name}")!;`
+      );
+    }
+
+    // Generate miniclient factory function
+    lines.push("");
+    lines.push("  // Factory function for lazy utility creation");
+    lines.push("  // deno-lint-ignore explicit-function-return-type");
+    lines.push("  export function miniclient() {");
+    lines.push("    return {");
+    for (const { action } of items) {
+      const lowerAction = action.charAt(0).toLowerCase() + action.slice(1);
+      lines.push(`      ${lowerAction}: _create(${lowerAction}),`);
+    }
+    lines.push("    };");
+    lines.push("  }");
+
+    lines.push("}");
+    lines.push("");
+  }
 
   return lines.join("\n");
 }
@@ -129,6 +327,9 @@ export async function transpile(
       : JSON.stringify(jsonData);
   }
 
+  // Generate MCP tool schemas
+  const mcpTools = generateMCPTools(contracts.contracts);
+
   // Write output if path provided
   let outputPath: string | undefined;
   if (output) {
@@ -141,6 +342,7 @@ export async function transpile(
     content,
     json: content, // backwards compatibility
     outputPath,
+    mcpTools,
   };
 }
 
@@ -172,6 +374,9 @@ export function transpileSync(
       : JSON.stringify(jsonData);
   }
 
+  // Generate MCP tool schemas
+  const mcpTools = generateMCPTools(contracts.contracts);
+
   // Write output if path provided
   let outputPath: string | undefined;
   if (output) {
@@ -184,6 +389,7 @@ export function transpileSync(
     content,
     json: content, // backwards compatibility
     outputPath,
+    mcpTools,
   };
 }
 

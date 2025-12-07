@@ -322,27 +322,284 @@
         description: List of applied changes
     required: [success]
 
-- name: target:update
+# PATCH = Partial updates to target properties/settings
+# Emulation settings
+- name: target:emulate
   path: /:endpoint/:context/:target
   method: PATCH
-  description: Update target properties
-  module: src/routes/target/update.ts
+  description: Device and viewport emulation settings
+  module: src/routes/target/emulate.ts
   request:
     type: object
     properties:
-      # Legacy - consider deprecating in favor of POST control
-      navigate:
+      # Viewport
+      viewport:
+        type: object
+        properties:
+          width:
+            type: integer
+            minimum: 1
+            description: Viewport width in pixels
+          height:
+            type: integer
+            minimum: 1
+            description: Viewport height in pixels
+          deviceScaleFactor:
+            type: number
+            minimum: 0
+            description: Device scale factor (DPR)
+          isMobile:
+            type: boolean
+            description: Enable mobile emulation
+          hasTouch:
+            type: boolean
+            description: Enable touch events
+          isLandscape:
+            type: boolean
+            description: Landscape orientation
+      # Device presets
+      device:
         type: string
-        description: Navigate to URL (deprecated, use POST)
-      script:
+        description: Device preset name (e.g., "iPhone 14", "Pixel 7")
+      # Color scheme
+      colorScheme:
         type: string
-        description: Execute JavaScript (deprecated, use POST)
-      activate:
-        type: boolean
-        description: Bring target to foreground (deprecated, use POST)
+        enum: [light, dark, no-preference]
+        description: Preferred color scheme
+      # Reduced motion
+      reducedMotion:
+        type: string
+        enum: [reduce, no-preference]
+        description: Reduced motion preference
+      # Forced colors
+      forcedColors:
+        type: string
+        enum: [active, none]
+        description: Forced colors mode
+      # Timezone
+      timezone:
+        type: string
+        description: Timezone ID (e.g., "America/New_York")
+      # Locale
+      locale:
+        type: string
+        description: Locale (e.g., "en-US")
+      # Geolocation
+      geolocation:
+        type: object
+        properties:
+          latitude:
+            type: number
+            minimum: -90
+            maximum: 90
+          longitude:
+            type: number
+            minimum: -180
+            maximum: 180
+          accuracy:
+            type: number
+            minimum: 0
+        required: [latitude, longitude]
   response:
     type: object
-    description: Response varies by action
+    properties:
+      success:
+        type: boolean
+      applied:
+        type: array
+        items:
+          type: string
+    required: [success]
+
+# Network throttling
+- name: target:throttle
+  path: /:endpoint/:context/:target
+  method: PATCH
+  description: Network and CPU throttling for performance testing
+  module: src/routes/target/throttle.ts
+  request:
+    type: object
+    properties:
+      # Network conditions
+      network:
+        type: object
+        properties:
+          offline:
+            type: boolean
+            description: Simulate offline mode
+          latency:
+            type: number
+            minimum: 0
+            description: Additional latency in milliseconds
+          downloadThroughput:
+            type: number
+            minimum: -1
+            description: Download speed in bytes/sec (-1 for no throttle)
+          uploadThroughput:
+            type: number
+            minimum: -1
+            description: Upload speed in bytes/sec (-1 for no throttle)
+          connectionType:
+            type: string
+            enum: [none, cellular2g, cellular3g, cellular4g, bluetooth, ethernet, wifi, wimax, other]
+            description: Connection type hint
+      # Network presets
+      networkPreset:
+        type: string
+        enum: [fast-3g, slow-3g, offline, no-throttle]
+        description: Network throttling preset
+      # CPU throttling
+      cpuThrottling:
+        type: number
+        minimum: 1
+        description: CPU slowdown factor (e.g., 4 = 4x slower)
+  response:
+    type: object
+    properties:
+      success:
+        type: boolean
+      network:
+        type: object
+        properties:
+          offline:
+            type: boolean
+          latency:
+            type: number
+          downloadThroughput:
+            type: number
+          uploadThroughput:
+            type: number
+      cpuThrottling:
+        type: number
+    required: [success]
+
+# Request interception
+- name: target:intercept
+  path: /:endpoint/:context/:target
+  method: PATCH
+  description: Request interception and modification rules
+  module: src/routes/target/intercept.ts
+  request:
+    type: object
+    properties:
+      # Blocked URLs (patterns)
+      blocked:
+        type: array
+        items:
+          type: string
+        description: URL patterns to block (supports wildcards)
+      # Header modifications
+      headers:
+        type: object
+        properties:
+          add:
+            type: object
+            additionalProperties:
+              type: string
+            description: Headers to add to all requests
+          remove:
+            type: array
+            items:
+              type: string
+            description: Header names to remove from all requests
+          override:
+            type: object
+            additionalProperties:
+              type: string
+            description: Headers to override in all requests
+      # Response mocking rules
+      mock:
+        type: array
+        items:
+          type: object
+          properties:
+            urlPattern:
+              type: string
+              description: URL pattern to match
+            status:
+              type: integer
+              description: Response status code
+            headers:
+              type: object
+              additionalProperties:
+                type: string
+            body:
+              type: string
+              description: Response body
+            contentType:
+              type: string
+              description: Content-Type header shorthand
+          required: [urlPattern]
+      # Clear all interception rules
+      clear:
+        type: boolean
+        description: Clear all interception rules
+  response:
+    type: object
+    properties:
+      success:
+        type: boolean
+      rules:
+        type: object
+        properties:
+          blocked:
+            type: integer
+          headers:
+            type: integer
+          mocks:
+            type: integer
+    required: [success]
+
+# Metadata/labeling
+- name: target:label
+  path: /:endpoint/:context/:target
+  method: PATCH
+  description: Target metadata and labeling for organization
+  module: src/routes/target/label.ts
+  request:
+    type: object
+    properties:
+      # Custom title (doesn't change actual page title)
+      displayName:
+        type: string
+        description: Custom display name for the target
+      # Tags for grouping/filtering
+      tags:
+        type: array
+        items:
+          type: string
+        description: Tags for categorization
+      # Custom metadata
+      metadata:
+        type: object
+        additionalProperties: true
+        description: Arbitrary key-value metadata
+      # Color coding
+      color:
+        type: string
+        description: Color for visual identification (hex or name)
+      # Group assignment
+      group:
+        type: string
+        description: Group name for organizing targets
+  response:
+    type: object
+    properties:
+      success:
+        type: boolean
+      displayName:
+        type: string
+      tags:
+        type: array
+        items:
+          type: string
+      metadata:
+        type: object
+      color:
+        type: string
+      group:
+        type: string
+    required: [success]
 
 - name: target:close
   path: /:endpoint/:context/:target
