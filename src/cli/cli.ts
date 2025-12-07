@@ -103,12 +103,12 @@ export class CLI implements ICLI {
   readonly flags: Record<string, string>;
 
   async #main(): Promise<unknown> {
-    if (this.flags.help || this.flags.h)
+    if ("help" in this.flags || "h" in this.flags)
       return this.help();
 
     const command = this.command as ValidCommand<this>;
 
-    if (!this.command)
+    if (!this.command || this.command.startsWith("-"))
       return this.help();
 
     if (command === "parse")
@@ -183,11 +183,12 @@ export class CLI implements ICLI {
   } {
     const flags = this.flags;
     const browser = flags.browser ?? flags.b ?? "chrome";
-    const profile = flags.profile ?? flags.p ?? "Claude";
+    const profile = flags.profile ?? flags.p ?? "Agent";
     const target = flags.target ?? flags.t;
     const url = flags.url ?? flags.u;
     return { browser, profile, target, url };
   }
+
   async info(): Promise<void> {
     const { client } = await this.#controller.ensure();
     const data = await client.listBrowsers() as {
