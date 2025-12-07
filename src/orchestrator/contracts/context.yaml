@@ -1,0 +1,102 @@
+# Context Level Contracts - /:endpoint/:context
+# Unified: browser instance (endpoint=browser, context=profile) OR direct connection (endpoint=host, context=port)
+#
+# Browser mode: manages launched browser instances
+# Connection mode: connects to existing CDP endpoints
+
+- name: context:exists
+  path: /:endpoint/:context
+  method: HEAD
+  description: Check if context (instance or connection) exists
+  module: src/routes/context/exists.ts
+  response:
+    type: "null"
+
+- name: context:info
+  path: /:endpoint/:context
+  method: GET
+  description: Get context info and list of targets
+  module: src/routes/context/info.ts
+  response:
+    type: object
+    properties:
+      # Common
+      endpoint:
+        type: string
+        description: Browser type or host
+      context:
+        type: string
+        description: Profile name or port
+      mode:
+        type: string
+        enum: [browser, connection]
+      port:
+        type: integer
+        description: CDP debugging port
+      wsEndpoint:
+        type: string
+        description: WebSocket endpoint URL
+      targets:
+        type: array
+        items:
+          type: object
+          properties:
+            id:
+              type: string
+            type:
+              type: string
+            title:
+              type: string
+            url:
+              type: string
+          required: [id, type, title, url]
+      # Browser mode only
+      createdAt:
+        type: string
+        format: date-time
+        description: When instance was launched (browser mode only)
+    required: [endpoint, context, mode, port, wsEndpoint, targets]
+
+- name: context:create
+  path: /:endpoint/:context
+  method: POST
+  description: Create context (launch browser instance or establish connection)
+  module: src/routes/context/create.ts
+  request:
+    type: object
+    properties:
+      # Browser mode
+      headless:
+        type: boolean
+        default: false
+        description: Run browser in headless mode (browser mode only)
+      # Common
+      port:
+        type: integer
+        description: Debugging port (browser mode uses this to launch, connection mode ignores - port is in URL)
+  response:
+    type: object
+    properties:
+      endpoint:
+        type: string
+      context:
+        type: string
+      mode:
+        type: string
+        enum: [browser, connection]
+      port:
+        type: integer
+      wsEndpoint:
+        type: string
+      created:
+        type: boolean
+        description: True if newly created, false if already existed
+    required: [endpoint, context, mode, port, wsEndpoint, created]
+
+- name: context:close
+  path: /:endpoint/:context
+  method: DELETE
+  description: Close context (terminate browser instance or disconnect)
+  module: src/routes/context/close.ts
+  response:
+    type: "null"

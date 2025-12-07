@@ -1,16 +1,18 @@
 # Browser Control API Contracts
 #
-# URL Pattern: /:browser/:profile/:target/:node
-# - browser: Browser type (chrome, edge, firefox, etc.)
-# - profile: Profile name or "default"
-# - target: Target ID (tab/page)
-# - node: Node ID (DOM element)
+# URL Pattern: /:endpoint/:context/:target/:node
+#
+# Unified routing - handler determines mode based on :endpoint value:
+# - Known browsers (chrome, edge, firefox, brave, chromium, opera, vivaldi):
+#   - endpoint = browser type, context = profile name
+# - Unknown (hosts):
+#   - endpoint = host address, context = port number
 #
 # Method semantics:
 # - HEAD: Health/existence checks
-# - GET: Queries and informational data
-# - POST: Creation operations
-# - PUT: Replacement operations
+# - GET: Queries and informational data (or WebSocket upgrade)
+# - POST: Browser/media control actions
+# - PUT: Content/DOM control
 # - PATCH: Update operations
 # - DELETE: Deletion/cleanup operations
 #
@@ -21,14 +23,14 @@ contracts:
   # Root Level - /
   - $include: ./root.yaml
 
-  # Browser Level - /:browser
-  - $include: ./browser.yaml
+  # Endpoint Level - /:endpoint (browser type OR host)
+  - $include: ./endpoint.yaml
 
-  # Instance Level - /:browser/:profile
-  - $include: ./instance.yaml
+  # Context Level - /:endpoint/:context (profile OR port)
+  - $include: ./context.yaml
 
-  # Target Level - /:browser/:profile/:target
+  # Target Level - /:endpoint/:context/:target
   - $include: ./target.yaml
 
-  # Node Level - /:browser/:profile/:target/:node
+  # Node Level - /:endpoint/:context/:target/:node
   - $include: ./node.yaml

@@ -1,4 +1,4 @@
-# Target Level Contracts - /:browser/:profile/:target
+# Target Level Contracts - /:endpoint/:context/:target
 # Tab/page management
 #
 # Method semantics:
@@ -11,10 +11,10 @@
 # WebSocket upgrade for CDP passthrough - MUST BE FIRST
 # Detected via Upgrade header, not request body
 - name: target:cdp
-  path: /:browser/:profile/:target
+  path: /:endpoint/:context/:target
   method: GET
   description: Upgrade to WebSocket for direct CDP access
-  module: target/cdp.ts
+  module: src/routes/target/cdp.ts
   request:
     type: object
     properties:
@@ -28,18 +28,18 @@
     description: Connection upgraded to WebSocket
 
 - name: target:exists
-  path: /:browser/:profile/:target
+  path: /:endpoint/:context/:target
   method: HEAD
   description: Check if target exists
-  module: target/exists.ts
+  module: src/routes/target/exists.ts
   response:
     type: "null"
 
 - name: target:info
-  path: /:browser/:profile/:target
+  path: /:endpoint/:context/:target
   method: GET
   description: Get target info or query nodes
-  module: target/info.ts
+  module: src/routes/target/info.ts
   request:
     type: object
     properties:
@@ -79,10 +79,10 @@
 
 # POST = Browser/media control
 - name: target:control
-  path: /:browser/:profile/:target
+  path: /:endpoint/:context/:target
   method: POST
   description: Browser and media control actions
-  module: target/control.ts
+  module: src/routes/target/control.ts
   request:
     type: object
     properties:
@@ -140,10 +140,10 @@
     description: Response varies by action
 
 - name: target:create
-  path: /:browser/:profile/:target
+  path: /:endpoint/:context/:target
   method: POST
   description: Create new target (tab)
-  module: target/create.ts
+  module: src/routes/target/create.ts
   request:
     type: object
     properties:
@@ -166,10 +166,10 @@
 
 # PUT = Content control (DOM, permissions, navigator APIs)
 - name: target:content
-  path: /:browser/:profile/:target
+  path: /:endpoint/:context/:target
   method: PUT
   description: Content and document control
-  module: target/content.ts
+  module: src/routes/target/content.ts
   request:
     type: object
     properties:
@@ -323,10 +323,10 @@
     required: [success]
 
 - name: target:update
-  path: /:browser/:profile/:target
+  path: /:endpoint/:context/:target
   method: PATCH
   description: Update target properties
-  module: target/update.ts
+  module: src/routes/target/update.ts
   request:
     type: object
     properties:
@@ -345,9 +345,9 @@
     description: Response varies by action
 
 - name: target:close
-  path: /:browser/:profile/:target
+  path: /:endpoint/:context/:target
   method: DELETE
   description: Close target (tab)
-  module: target/close.ts
+  module: src/routes/target/close.ts
   response:
     type: "null"

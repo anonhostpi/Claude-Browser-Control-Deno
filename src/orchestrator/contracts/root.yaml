@@ -5,7 +5,7 @@
   path: /
   method: HEAD
   description: Server health check
-  module: root/health.ts
+  module: src/routes/root/health.ts
   response:
     type: "null"
 
@@ -13,7 +13,7 @@
   path: /
   method: GET
   description: List available browsers
-  module: root/list.ts
+  module: src/routes/root/list.ts
   response:
     type: object
     properties:
@@ -35,7 +35,7 @@
   path: /
   method: DELETE
   description: Kill all browser instances
-  module: root/killAll.ts
+  module: src/routes/root/killAll.ts
   response:
     type: object
     properties:

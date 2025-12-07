@@ -1,19 +1,19 @@
-# Node Level Contracts - /:browser/:profile/:target/:node
+# Node Level Contracts - /:endpoint/:context/:target/:node
 # DOM node interaction
 
 - name: node:exists
-  path: /:browser/:profile/:target/:node
+  path: /:endpoint/:context/:target/:node
   method: HEAD
   description: Check if node exists
-  module: node/exists.ts
+  module: src/routes/node/exists.ts
   response:
     type: "null"
 
 - name: node:info
-  path: /:browser/:profile/:target/:node
+  path: /:endpoint/:context/:target/:node
   method: GET
   description: Get node info or children
-  module: node/info.ts
+  module: src/routes/node/info.ts
   request:
     type: object
     properties:
@@ -54,10 +54,10 @@
     required: [nodeId, nodeName, nodeType]
 
 - name: node:create
-  path: /:browser/:profile/:target/:node
+  path: /:endpoint/:context/:target/:node
   method: POST
   description: Create child node
-  module: node/create.ts
+  module: src/routes/node/create.ts
   request:
     type: object
     properties:
@@ -92,10 +92,10 @@
     required: [nodeId, nodeName, nodeType]
 
 - name: node:replace
-  path: /:browser/:profile/:target/:node
+  path: /:endpoint/:context/:target/:node
   method: PUT
   description: Replace node content
-  module: node/replace.ts
+  module: src/routes/node/replace.ts
   request:
     type: object
     properties:
@@ -122,10 +122,10 @@
     required: [success]
 
 - name: node:interact
-  path: /:browser/:profile/:target/:node
+  path: /:endpoint/:context/:target/:node
   method: PATCH
   description: Interact with node
-  module: node/interact.ts
+  module: src/routes/node/interact.ts
   request:
     type: object
     properties:
@@ -204,9 +204,9 @@
     required: [success, action]
 
 - name: node:remove
-  path: /:browser/:profile/:target/:node
+  path: /:endpoint/:context/:target/:node
   method: DELETE
   description: Remove node from DOM
-  module: node/remove.ts
+  module: src/routes/node/remove.ts
   response:
     type: "null"

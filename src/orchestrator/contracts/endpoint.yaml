@@ -1,0 +1,126 @@
+# Endpoint Level Contracts - /:endpoint
+# Unified: browser type OR host address
+#
+# When :endpoint is a known browser (chrome, edge, firefox, brave, chromium, opera, vivaldi):
+#   - GET returns browser info and profiles
+#   - POST launches with default profile
+#   - DELETE kills all instances
+#
+# When :endpoint is a host (anything else):
+#   - GET scans for CDP-enabled ports
+#   - POST/DELETE not applicable
+
+- name: endpoint:exists
+  path: /:endpoint
+  method: HEAD
+  description: Check if endpoint (browser or host) is available
+  module: src/routes/endpoint/exists.ts
+  response:
+    type: "null"
+
+- name: endpoint:info
+  path: /:endpoint
+  method: GET
+  description: Get browser info/profiles OR scan host for CDP ports
+  module: src/routes/endpoint/info.ts
+  request:
+    type: object
+    properties:
+      # For host scanning
+      range:
+        type: string
+        description: Port range to scan (e.g., "9200-9300")
+      ports:
+        type: array
+        items:
+          type: integer
+        description: Specific ports to scan
+  response:
+    type: object
+    properties:
+      # Common
+      endpoint:
+        type: string
+        description: The endpoint value (browser type or host)
+      mode:
+        type: string
+        enum: [browser, host]
+        description: Whether this is a browser or host endpoint
+      # Browser mode
+      type:
+        type: string
+      name:
+        type: string
+      path:
+        type: string
+      userDataDir:
+        type: string
+      profiles:
+        type: array
+        items:
+          type: object
+          properties:
+            name:
+              type: string
+            displayName:
+              type: string
+            isDefault:
+              type: boolean
+          required: [name, displayName, isDefault]
+      # Host mode
+      ports:
+        type: array
+        description: CDP-enabled ports found on host
+        items:
+          type: object
+          properties:
+            port:
+              type: integer
+            protocol:
+              type: string
+              description: Protocol type (cdp, devtools)
+            version:
+              type: string
+          required: [port]
+    required: [endpoint, mode]
+
+- name: endpoint:launch
+  path: /:endpoint
+  method: POST
+  description: Launch browser with default profile (browser mode only)
+  module: src/routes/endpoint/launch.ts
+  request:
+    type: object
+    properties:
+      headless:
+        type: boolean
+        default: false
+      port:
+        type: integer
+        description: Optional debugging port
+  response:
+    type: object
+    properties:
+      browser:
+        type: string
+      profile:
+        type: string
+        description: Profile that was used (default)
+      port:
+        type: integer
+      wsEndpoint:
+        type: string
+    required: [browser, profile, port, wsEndpoint]
+
+- name: endpoint:killAll
+  path: /:endpoint
+  method: DELETE
+  description: Kill all instances of browser type (browser mode only)
+  module: src/routes/endpoint/killAll.ts
+  response:
+    type: object
+    properties:
+      killed:
+        type: integer
+        description: Number of instances killed
+    required: [killed]
