@@ -1,23 +1,31 @@
 import { Client } from "./client.ts";
-import { EndpointContract } from "../contract.ts";
-import { JSONSchema, FromSchema } from "json-schema-to-ts";
+import type { EndpointContract } from "../contract.ts";
+import type { JSONSchema, FromSchema } from "json-schema-to-ts";
 
 function _create<
   RequestType,
   ResponseType,
   ErrorType
->(contract: EndpointContract<JSONSchema, JSONSchema, JSONSchema>): (client: Client, request?: RequestType) => Promise<ResponseType | ErrorType> {
+>(contract: EndpointContract): (client: Client, request?: RequestType) => Promise<ResponseType | ErrorType> {
   return async (client: Client, request?: RequestType): Promise<ResponseType | ErrorType> => {
-    const response = contract.request ?
-      await client.complex(
-        contract.method,
-        contract.path,
-        request
-      ) :
-      await client.simple(
-        contract.method,
-        contract.path
-      );
+    let response: unknown;
+    switch (contract.method) {
+      case "HEAD":
+      case "DELETE":
+        await client.simple(contract.method, contract.path);
+        response = undefined;
+        break;
+      case "GET":
+        response = await client.simple(contract.method, contract.path);
+        break;
+      case "POST":
+      case "PUT":
+      case "PATCH":
+        response = contract.request
+          ? await client.complex(contract.method, contract.path, request)
+          : await client.simple(contract.method, contract.path);
+        break;
+    }
     return response as ResponseType | ErrorType;
   }
 }
