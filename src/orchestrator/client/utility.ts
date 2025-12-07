@@ -2,6 +2,21 @@ import { Client } from "./client.ts";
 import type { EndpointContract } from "../contract.ts";
 import type { JSONSchema, FromSchema } from "json-schema-to-ts";
 
+/**
+ * Extract a contract by its name from a contracts array type.
+ *
+ * @example
+ * ```ts
+ * import { contracts } from "../contracts/api.ts";
+ * type TargetControl = ContractByName<typeof contracts, "target:control">;
+ * // TargetControl is the full contract type with request/response schemas
+ * ```
+ */
+export type ContractByName<
+  Contracts extends readonly EndpointContract[],
+  Name extends Contracts[number]["name"]
+> = Extract<Contracts[number], { name: Name }>;
+
 function _create<
   RequestType,
   ResponseType,
