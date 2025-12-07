@@ -1,11 +1,11 @@
 import { Method } from "../contract.ts";
 
-export interface IClient {
-  readonly url: string;
+export interface HasUrl {
+  url: string;
 }
 
-export class Client implements IClient {
-  constructor(url: string | IClient, path?: string) {
+export class Client implements HasUrl {
+  constructor(url: string | HasUrl, path?: string) {
     if (typeof url === "string") {
       this.#url = url;
     } else {
@@ -15,7 +15,7 @@ export class Client implements IClient {
   }
 
   #url?: string;
-  #parent?: IClient;
+  #parent?: HasUrl;
   #path?: string;
 
   get url(): string {
