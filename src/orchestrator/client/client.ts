@@ -40,33 +40,40 @@ export class Client implements HasUrl {
   }
   async alive(path?: string, specificCode?: number): Promise<boolean> {
     try {
-      const status = (await fetch(
-        this.#full(path),
-        { method: "HEAD" }
-      )).status;
-      return specificCode
-        ? status === specificCode
-        : (status / 100 | 0) === 2; 
-    } catch {
-      return false;
+      await this.head(path, specificCode);
+      return true;
+    } catch (error) {
+      if (error instanceof ResponseError)
+        return false;
+      else
+        throw error;
     }
   }
   
   async simple(
     method: Method,
-    path?: string
+    path?: string,
+    specificCode?: number
   ): Promise<unknown> {
     const response = await fetch(
       this.#full(path),
       { method }
     );
+    const ok = response.ok && (specificCode ? response.status === specificCode : true);
+    if (!ok) {
+      throw new ResponseError(
+        response.statusText,
+        response.status
+      );
+    }
     const text = await response.text();
     return text ? JSON.parse(text) : undefined;
   }
   async complex(
     method: Method,
     path?: string | unknown,
-    body?: unknown
+    body?: unknown,
+    specificCode?: number
   ): Promise<unknown>;
   async complex(
     method: Method,
@@ -75,44 +82,52 @@ export class Client implements HasUrl {
   async complex(
     method: Method,
     pathOrBody?: string | unknown,
-    maybeBody?: unknown
+    maybeBody?: unknown,
+    specificCode?: number
   ): Promise<unknown> {
     const path = typeof pathOrBody === "string" ? pathOrBody : undefined;
     const body = typeof pathOrBody === "string" ? maybeBody : pathOrBody;
-    return (await fetch(
+    const response = await fetch(
       this.#full(path),
       {
         method,
-
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       }
-    )).json();
+    );
+    const ok = response.ok && (specificCode ? response.status === specificCode : true);
+    if (!ok) {
+      throw new ResponseError(
+        response.statusText,
+        response.status
+      );
+    }
+    return response.json();
   }
 
-  head(path?: string): Promise<void> {
-    return this.simple("HEAD", path) as Promise<void>;
+  head(path?: string, specificCode?: number): Promise<void> {
+    return this.simple("HEAD", path, specificCode) as Promise<void>;
   }
-  delete(path?: string): Promise<void> {
-    return this.simple("DELETE", path) as Promise<void>;
+  delete(path?: string, specificCode?: number): Promise<void> {
+    return this.simple("DELETE", path, specificCode) as Promise<void>;
   }
-  get(path?: string): Promise<unknown> {
-    return this.simple("GET", path);
+  get(path?: string, specificCode?: number): Promise<unknown> {
+    return this.simple("GET", path, specificCode);
   }
 
   put(body?: unknown): Promise<unknown>;
   put(path?: string, body?: unknown): Promise<unknown>;
-  put(pathOrBody?: string | unknown, maybeBody?: unknown): Promise<unknown> {
-    return this.complex("PUT", pathOrBody, maybeBody);
+  put(pathOrBody?: string | unknown, maybeBody?: unknown, specificCode?: number): Promise<unknown> {
+    return this.complex("PUT", pathOrBody, maybeBody, specificCode);
   }
   patch(body?: unknown): Promise<unknown>;
   patch(path?: string, body?: unknown): Promise<unknown>;
-  patch(pathOrBody?: string | unknown, maybeBody?: unknown): Promise<unknown> {
-    return this.complex("PATCH", pathOrBody, maybeBody);
+  patch(pathOrBody?: string | unknown, maybeBody?: unknown, specificCode?: number): Promise<unknown> {
+    return this.complex("PATCH", pathOrBody, maybeBody, specificCode);
   }
   post(body?: unknown): Promise<unknown>;
   post(path?: string, body?: unknown): Promise<unknown>;
-  post(pathOrBody?: string | unknown, maybeBody?: unknown): Promise<unknown> {
-    return this.complex("POST", pathOrBody, maybeBody);
+  post(pathOrBody?: string | unknown, maybeBody?: unknown, specificCode?: number): Promise<unknown> {
+    return this.complex("POST", pathOrBody, maybeBody, specificCode);
   }
 };
