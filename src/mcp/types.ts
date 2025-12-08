@@ -1,7 +1,11 @@
 /**
  * MCP (Model Context Protocol) type definitions.
  *
- * Based on the MCP specification for JSON-RPC 2.0 communication.
+ * Provides:
+ * - JSON-RPC 2.0 types for MCP communication
+ * - Contract-derived interfaces for type-safe tool handling
+ * - Tool schema types for MCP specification compliance
+ *
  * @see https://modelcontextprotocol.io/
  */
 
@@ -44,7 +48,22 @@ export interface JSONRPCNotification {
 }
 
 /**
- * MCP Tool definition
+ * Standard JSON-RPC error codes
+ */
+export const ErrorCodes = {
+  ParseError: -32700,
+  InvalidRequest: -32600,
+  MethodNotFound: -32601,
+  InvalidParams: -32602,
+  InternalError: -32603,
+} as const;
+
+// =============================================================================
+// MCP Tool Schema Types
+// =============================================================================
+
+/**
+ * MCP Tool definition (from MCP specification)
  */
 export interface MCPTool {
   name: string;
