@@ -28,6 +28,10 @@ export class Client implements HasUrl {
     return this.#path ? new URL(this.#path, base).href : parentUrl;
   }
 
+  get parent(): string | undefined {
+    return this.#parent?.url;
+  }
+
   get path(): string {
     if (this.#parent?.path)
       return [this.#parent.path, this.#path].filter(Boolean).join("/");
