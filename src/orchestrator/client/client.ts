@@ -1,5 +1,7 @@
 import { Method } from "../contract.ts";
+import { CodedError as ResponseError } from "../server/errors.ts";
 
+export { ResponseError };
 export interface HasUrl {
   url: string;
   path?: string;
