@@ -9,7 +9,7 @@
  * - End-to-end integration
  */
 
-import { assertEquals, assertExists, assertThrows } from "@std/assert";
+import { assertEquals, assertExists, assertRejects, assertThrows } from "@std/assert";
 import { Client } from "./client/client.ts";
 import { create as createClientUtility, type ContractByName } from "./client/utility.ts";
 import { build as buildRoutes } from "./server/builder.ts";
@@ -141,10 +141,12 @@ Deno.test("Client: constructs correct URL with path", () => {
   assertEquals(client.url, "http://example.com");
 });
 
-Deno.test("Client: alive returns false when server is down", async () => {
+Deno.test("Client: alive throws TypeError when server is down", async () => {
   const client = new Client("http://localhost:59999"); // Unlikely to be running
-  const result = await client.alive();
-  assertEquals(result, false);
+  await assertRejects(
+    () => client.alive(),
+    TypeError,
+  );
 });
 
 Deno.test("Client: simple GET request", async () => {
@@ -2139,6 +2141,15 @@ export function create(_contract: unknown) {
 }
 `;
   await Deno.writeTextFile(`${clientDir}/utility.ts`, utilityCode);
+
+  // Mock client.ts for the Client type import
+  const clientCode = `
+// Mock Client class for type checking test
+export class Client {
+  constructor(_url: string) {}
+}
+`;
+  await Deno.writeTextFile(`${clientDir}/client.ts`, clientCode);
 
   try {
     // Transpile to TypeScript
