@@ -195,6 +195,7 @@ function generateTypeScript(contracts: LoadedContracts): string {
     "",
     "import type { FromSchema } from \"json-schema-to-ts\";",
     "import type { ContractByName } from \"../client/utility.ts\";",
+    "import type { Client } from \"../client/client.ts\";",
     "import { create as _create } from \"../client/utility.ts\";",
     "",
   ];
@@ -273,12 +274,64 @@ function generateTypeScript(contracts: LoadedContracts): string {
     lines.push("  // deno-lint-ignore explicit-function-return-type");
     lines.push("  export function miniclient() {");
     lines.push("    return {");
-    for (const { action } of items) {
+    for (const { contract, action } of items) {
       const lowerAction = action.charAt(0).toLowerCase() + action.slice(1);
-      lines.push(`      ${lowerAction}: _create(${lowerAction}),`);
+      // Determine return type based on response schema
+      const hasResponse = contract.response && (contract.response as { type?: string }).type !== "null";
+      const returnType = hasResponse ? `${action}Response` : "void";
+
+      if (contract.request) {
+        // Has request schema -> required parameter
+        lines.push(`      ${lowerAction}: _create(${lowerAction}) as unknown as (client: Client, request: ${action}Request) => Promise<${returnType}>,`);
+      } else {
+        // No request schema -> no request parameter
+        lines.push(`      ${lowerAction}: _create(${lowerAction}) as unknown as (client: Client) => Promise<${returnType}>,`);
+      }
     }
     lines.push("    };");
     lines.push("  }");
+
+    // Generate Binding type - keys are full contract names, values are non-nullable
+    lines.push("");
+    lines.push("  // Type for building handler/binding objects with full contract names as keys");
+    lines.push("  export type Binding<Value = unknown> = {");
+    for (const { contract } of items) {
+      lines.push(`    "${contract.name}": NonNullable<Value>;`);
+    }
+    lines.push("  };");
+
+    // Generate AssertBinding type for compile-time validation
+    lines.push("");
+    lines.push("  // Compile-time assertion that a type extends Binding");
+    lines.push("  export type AssertBinding<T extends Binding<Value>, Value = unknown> = T;");
+
+    // Generate FullBinding type - Binding plus the base namespace key
+    lines.push("");
+    lines.push("  // Binding with the base namespace key included");
+    lines.push("  export type FullBinding<Value = unknown> = Binding<Value> & {");
+    lines.push(`    "${namespace.toLowerCase()}": NonNullable<Value>;`);
+    lines.push("  };");
+
+    // Generate AssertFullBinding type for compile-time validation
+    lines.push("");
+    lines.push("  // Compile-time assertion that a type extends FullBinding");
+    lines.push("  export type AssertFullBinding<T extends FullBinding<Value>, Value = unknown> = T;");
+
+    // Generate MiniBinding type - keys are just action names
+    lines.push("");
+    lines.push("  // Binding with just action names as keys");
+    lines.push("  // Meant to be used as an interface to ensure clients fully implement the associated contracts.");
+    lines.push("  export type MiniBinding<Value = unknown> = {");
+    for (const { action } of items) {
+      const lowerAction = action.charAt(0).toLowerCase() + action.slice(1);
+      lines.push(`    "${lowerAction}": NonNullable<Value>;`);
+    }
+    lines.push("  };");
+
+    // Generate AssertMiniBinding type for compile-time validation
+    lines.push("");
+    lines.push("  // Compile-time assertion that a type extends MiniBinding");
+    lines.push("  export type AssertMiniBinding<T extends MiniBinding<Value>, Value = unknown> = T;");
 
     lines.push("}");
     lines.push("");
