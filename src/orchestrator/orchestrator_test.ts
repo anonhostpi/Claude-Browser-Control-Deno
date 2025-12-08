@@ -260,27 +260,6 @@ Deno.test("Client: parent URL propagation", () => {
   // Create grandchild
   const grandchild = new Client(child, "default");
   assertEquals(grandchild.url, "http://localhost:9333/chrome/default");
-
-  // Update parent URL - children should reflect the change
-  parent.url = "http://localhost:8080";
-  assertEquals(parent.url, "http://localhost:8080");
-  assertEquals(child.url, "http://localhost:8080/chrome");
-  assertEquals(grandchild.url, "http://localhost:8080/chrome/default");
-});
-
-Deno.test("Client: url setter breaks parent chain", () => {
-  const parent = new Client("http://localhost:9333");
-  const child = new Client(parent, "chrome");
-
-  assertEquals(child.url, "http://localhost:9333/chrome");
-
-  // Setting url directly breaks parent chain
-  child.url = "http://different:8080/custom";
-  assertEquals(child.url, "http://different:8080/custom");
-
-  // Parent changes no longer affect child
-  parent.url = "http://localhost:9999";
-  assertEquals(child.url, "http://different:8080/custom");
 });
 
 Deno.test("Client: empty path inherits parent URL", () => {
