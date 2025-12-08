@@ -90,7 +90,7 @@ export class Server {
     const instances = registry.list();
     for (const instance of instances) {
       try {
-        await instance.launched.close();
+        await instance.close();
       } catch {
         // Ignore errors during cleanup
       }

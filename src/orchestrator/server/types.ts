@@ -3,10 +3,6 @@
  * @module
  */
 
-import type { IBrowser } from "../../browsers/mod.deprecated.ts";
-import type { ProfileInfo } from "../../profiles/mod.deprecated.ts";
-import type { LaunchedBrowser } from "../../launcher/mod.deprecated.ts";
-
 /** Server configuration */
 export interface ServerConfig {
   port: number;
@@ -21,13 +17,13 @@ export interface InstanceKey {
   profile: string;
 }
 
-/** Running browser instance */
+/** Running browser instance - simplified for new architecture */
 export interface Instance {
   key: InstanceKey;
-  browser: IBrowser;
-  profile: ProfileInfo;
-  launched: LaunchedBrowser;
+  port: number;
+  wsEndpoint: string;
   createdAt: Date;
+  close: () => Promise<void>;
 }
 
 export const DEFAULT_SERVER_PORT = 9333;
