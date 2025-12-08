@@ -149,17 +149,10 @@ export type ParsedArgs = {
 export type ContractCommand = () => Promise<JSONSerializable>;
 
 /**
- * Contract CLI interface - maps full contract names to commands
+ * Contract CLI interface - maps full contract names to commands.
+ * Auto-generated in api.ts from all contract namespaces.
  */
-export type IContractCLI =
-  & API.Root.Binding<ContractCommand>
-  & API.Endpoint.Binding<ContractCommand>
-  & API.Context.Binding<ContractCommand>
-  & API.Target.Binding<ContractCommand>
-  & API.Node.Binding<ContractCommand>;
-
-// Compile-time verification
-type _VerifyContractCLI = API.Root.AssertBinding<IContractCLI, ContractCommand>;
+export type IContractCLI = API.IContractCLI<ContractCommand>;
 
 // =============================================================================
 // Additional CLI Commands

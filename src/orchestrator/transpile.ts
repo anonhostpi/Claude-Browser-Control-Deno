@@ -340,6 +340,52 @@ function generateTypeScript(contracts: LoadedContracts): string {
     lines.push("");
   }
 
+  // Generate combined types for CLI and MCP
+  const namespaceNames = Array.from(groups.keys());
+
+  lines.push("// =============================================================================");
+  lines.push("// Combined Interface Types (auto-generated from all namespaces)");
+  lines.push("// =============================================================================");
+  lines.push("");
+
+  // IContractCLI - combines all Binding types with colon naming (root:health)
+  lines.push("/**");
+  lines.push(" * Combined CLI binding type - maps full contract names to handlers.");
+  lines.push(" * Used by CLI to implement all contract commands.");
+  lines.push(" */");
+  lines.push("export type IContractCLI<Value = unknown> =");
+  for (let i = 0; i < namespaceNames.length; i++) {
+    const ns = namespaceNames[i];
+    const prefix = i === 0 ? "  " : "  & ";
+    lines.push(`${prefix}${ns}.Binding<Value>`);
+  }
+  lines.push("  ;");
+  lines.push("");
+
+  // IMCP helper type for prefixing
+  lines.push("/**");
+  lines.push(" * Helper type to prefix MiniBinding keys with namespace.");
+  lines.push(" * Maps \"health\" -> \"root_health\", \"info\" -> \"endpoint_info\", etc.");
+  lines.push(" */");
+  lines.push("type PrefixedMiniBinding<Prefix extends string, T> = {");
+  lines.push("  [K in keyof T as `${Prefix}_${K & string}`]: T[K];");
+  lines.push("};");
+  lines.push("");
+
+  // IContractMCP - combines all MiniBinding types with underscore naming (root_health)
+  lines.push("/**");
+  lines.push(" * Combined MCP binding type - maps tool names (underscore format) to handlers.");
+  lines.push(" * Used by MCP server to implement all tool handlers.");
+  lines.push(" */");
+  lines.push("export type IContractMCP<Value = unknown> =");
+  for (let i = 0; i < namespaceNames.length; i++) {
+    const ns = namespaceNames[i];
+    const prefix = i === 0 ? "  " : "  & ";
+    lines.push(`${prefix}PrefixedMiniBinding<"${ns.toLowerCase()}", ${ns}.MiniBinding<Value>>`);
+  }
+  lines.push("  ;");
+  lines.push("");
+
   return lines.join("\n");
 }
 
