@@ -1,4 +1,5 @@
 import { Hono, Handler, Context } from "hono";
+import { upgradeWebSocket } from "hono/deno";
 import { EndpointContract, Method } from "../contract.ts";
 import { JSONSchema } from "json-schema-to-ts";
 import * as AJV from "ajv";
@@ -180,6 +181,19 @@ class RouteBuilder extends Map<string, RouteBuilder> {
         const method = contract.method;
         if (!handlers[method])
           handlers[method] = [];
+
+        // Prepend WebSocket middleware for contracts with websocket: true
+        if (contract.websocket) {
+          const base = this.base;
+          const wsHandler = upgradeWebSocket(async (c) => {
+            const modulePath = base
+              ? new URL(contract.module, base).href
+              : contract.module;
+            const handler = await import(modulePath);
+            return handler.ws(c);
+          });
+          handlers[method]!.push(wsHandler);
+        }
 
         const assert = {
           request: contract.request

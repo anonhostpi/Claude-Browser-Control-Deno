@@ -226,6 +226,9 @@ function generateTypeScript(contracts: LoadedContracts): string {
     if (contract.mcp) {
       lines.push(`    mcp: ${JSON.stringify(contract.mcp, null, 2).split("\n").join("\n    ")},`);
     }
+    if (contract.websocket) {
+      lines.push(`    websocket: true,`);
+    }
     lines.push("  } as const,");
   }
 

@@ -29,4 +29,5 @@ export type EndpointContract<
   response: ResponseSchema; // JSON Schema for the response body
   module: string; // module where the method is defined for server-side
   mcp?: MCPToolConfig; // MCP tool configuration (optional)
+  websocket?: boolean; // Enable WebSocket upgrade support (additive to HTTP)
 };

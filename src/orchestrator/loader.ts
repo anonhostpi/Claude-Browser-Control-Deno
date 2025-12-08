@@ -400,5 +400,6 @@ function validateContract(data: unknown): EndpointContract {
     request: obj.request as JSONSchema | undefined,
     error: obj.error as JSONSchema | undefined,
     mcp: obj.mcp as MCPToolConfig | undefined,
+    websocket: obj.websocket === true ? true : undefined,
   };
 }

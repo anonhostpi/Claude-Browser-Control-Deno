@@ -13,19 +13,16 @@
 - name: target:cdp
   path: /:endpoint/:context/:target
   method: GET
-  description: Upgrade to WebSocket for direct CDP access
+  websocket: true
+  description: WebSocket for direct CDP access, or GET for WebSocket URL
   module: src/routes/target/cdp.ts
-  request:
+  response:
     type: object
     properties:
-      upgrade:
+      ws:
         type: string
-        const: websocket
-        description: Detected via Upgrade header
-    required: [upgrade]
-  response:
-    type: "null"
-    description: Connection upgraded to WebSocket
+        description: WebSocket URL for CDP connection
+    required: [ws]
 
 - name: target:exists
   path: /:endpoint/:context/:target
