@@ -109,6 +109,20 @@ export type PathParam =
     & API.Node.FullBinding
   >;
 
+/**
+ * Path parameters type (excludes "root" since root has no path params)
+ * Derived from contract bindings for type safety.
+ */
+export type PathParams = {
+  [K in Exclude<PathParam, "root">]?: string;
+};
+
+/**
+ * Client level type - same as PathParam.
+ * Represents the hierarchy levels: root, endpoint, context, target, node.
+ */
+export type ClientLevel = PathParam;
+
 export type AllExtensions =
   & RootExtensions
   & EndpointExtensions

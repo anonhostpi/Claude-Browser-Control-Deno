@@ -6,7 +6,7 @@
  */
 
 import * as API from "../orchestrator/contracts/api.ts";
-import { Helpers } from "../client/core.ts";
+import { Helpers, PathParam, PathParams, ClientLevel } from "../client/core.ts";
 
 // =============================================================================
 // JSON Serializable Types
@@ -16,29 +16,6 @@ import type {
   JSONPrimitive,
   JSONSerializable
 } from "../orchestrator/schema.ts";
-
-// =============================================================================
-// Path Parameters (Auto-derived from API bindings)
-// =============================================================================
-
-/**
- * Path parameter keys derived from API FullBindings
- * Excludes "root" since it has no path param
- */
-export type PathParam = Helpers.MainKey<
-  & API.Root.FullBinding
-  & API.Endpoint.FullBinding
-  & API.Context.FullBinding
-  & API.Target.FullBinding
-  & API.Node.FullBinding
->;
-
-/**
- * Path parameters type (excludes "root" since root has no path params)
- */
-export type PathParams = {
-  [K in Exclude<PathParam, "root">]?: string;
-};
 
 // =============================================================================
 // Flag Types (Segmented by Command)
@@ -196,13 +173,10 @@ export interface ContractInfo {
 export type ICLI = IContractCLI & IAdditionalCLI;
 
 // =============================================================================
-// Client Level Type (derived from API namespaces)
+// Client Level Type (re-exported from client/core.ts)
 // =============================================================================
 
-/**
- * Client level type derived from API namespace names
- */
-export type ClientLevel = "root" | "endpoint" | "context" | "target" | "node";
+export type { ClientLevel };
 
 // =============================================================================
 // Command Names
