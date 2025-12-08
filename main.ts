@@ -21,95 +21,92 @@ const USAGE = `
 Claude Browser Control - Control Chrome-based browsers with Deno
 
 USAGE:
-  deno task start <command> [options]
+  deno task start <command> [flags] [json-body]
 
 BUILT-IN COMMANDS:
-  serve             Start the REST API server
-  mcp               Start the MCP server (JSON-RPC over stdio)
+  serve:rest        Start the REST API server
+  serve:mcp         Start the MCP server
   contracts         List all available contract commands
   version           Show version number
-  help              Show this help message
+  location          Show CLI executable path
+  help [command]    Show help (optionally for specific command)
 
 CONTRACT COMMANDS (use contract name directly):
   root:health                  Health check
   root:list                    List available browsers
   root:killAll                 Kill all browser instances
-  endpoint:exists              Check if endpoint exists (--endpoint)
-  endpoint:info                Get browser info/profiles (--endpoint)
-  endpoint:launch              Launch browser with default profile (--endpoint)
-  endpoint:killAll             Kill all instances of browser type (--endpoint)
-  context:exists               Check if context exists (--endpoint --context)
-  context:info                 Get context info and targets (--endpoint --context)
-  context:create               Launch browser instance (--endpoint --context)
-  context:close                Close browser instance (--endpoint --context)
-  target:exists                Check if target exists (--endpoint --context --target)
-  target:info                  Get target info (--endpoint --context --target)
-  target:cdp                   Get WebSocket URL for CDP access
-  target:control               Control target (navigate, screenshot, etc.)
-  target:content               Content/document control (permissions, cookies)
-  target:emulate               Device/viewport emulation (--viewport, --device)
-  target:throttle              Network/CPU throttling (--networkPreset, --cpuThrottling)
-  target:intercept             Request interception (--blocked, --headers, --mock)
-  target:label                 Metadata/labeling (--displayName, --tags, --color)
-  target:create                Create new target/tab (--endpoint --context --url)
-  target:close                 Close target (--endpoint --context --target)
-  node:exists                  Check if node exists (--endpoint --context --target --node)
-  node:info                    Get DOM node info (--endpoint --context --target --node)
-  node:create                  Create child node
-  node:replace                 Replace node content
-  node:interact                Interact with node (click, type, etc.)
-  node:remove                  Remove node from DOM
+  endpoint:exists              Check if endpoint exists (-e)
+  endpoint:info                Get browser info/profiles (-e)
+  endpoint:launch              Launch browser with default profile (-e)
+  endpoint:killAll             Kill all instances of browser type (-e)
+  context:exists               Check if context exists (-e -c)
+  context:info                 Get context info and targets (-e -c)
+  context:create               Launch browser instance (-e -c)
+  context:close                Close browser instance (-e -c)
+  target:exists                Check if target exists (-e -c -t)
+  target:info                  Get target info (-e -c -t)
+  target:cdp                   Get WebSocket URL for CDP access (-e -c -t)
+  target:control               Control target (navigate, screenshot, etc.) (-e -c -t)
+  target:content               Content/document control (permissions, cookies) (-e -c -t)
+  target:emulate               Device/viewport emulation (-e -c -t)
+  target:throttle              Network/CPU throttling (-e -c -t)
+  target:intercept             Request interception (-e -c -t)
+  target:label                 Metadata/labeling (-e -c -t)
+  target:create                Create new target/tab (-e -c -t)
+  target:close                 Close target (-e -c -t)
+  node:exists                  Check if node exists (-e -c -t -n)
+  node:info                    Get DOM node info (-e -c -t -n)
+  node:create                  Create child node (-e -c -t -n)
+  node:replace                 Replace node content (-e -c -t -n)
+  node:interact                Interact with node (click, type, etc.) (-e -c -t -n)
+  node:remove                  Remove node from DOM (-e -c -t -n)
 
-PATH PARAMETERS (required based on command):
-  --endpoint        Browser type (chrome, edge, brave) or host address
-  --context         Profile name or port number
-  --target          Target ID (tab/page)
-  --node            Node ID (DOM element)
+FLAGS:
+  -h, --help        Show help
+  -s, --server      API server URL (default: http://localhost:9333)
+  -e, --endpoint    Browser type (chrome, edge, brave) or host address
+  -c, --context     Profile name or port number
+  -t, --target      Target ID (tab/page)
+  -n, --node        Node ID (DOM element)
 
-SERVER OPTIONS:
-  --port            Server port (default: 9333)
-  --parent-pid      Exit when parent PID dies
-  --server          API server URL (default: http://localhost:9333)
+SERVE FLAGS:
+  -i, --host        Host to bind (default: localhost)
+  -p, --port        Port to bind (default: 9333)
 
-MCP OPTIONS:
-  --api-url         REST API URL (default: http://localhost:9333)
-
-CONTRACT OPTIONS (vary by command, see contracts for details):
-  --headless        Run browser in headless mode
-  --url             URL to navigate to
-  --xpath           XPath query for node selection
-  --css             CSS selector for node selection
-  --navigate        Navigate to URL
-  --click           Click the element
-  --type            Text to type into element
+REQUEST BODY:
+  Pass request options as a JSON string argument after flags.
+  Example: '{"headless":true}' or '{"navigate":"https://example.com"}'
 
 EXAMPLES:
   # Start the server
-  deno task start serve
+  deno task start serve:rest
 
-  # Start MCP server
-  deno task start mcp
+  # Start MCP server (uses --server for API URL)
+  deno task start serve:mcp -s http://localhost:9333
 
   # List available browsers
   deno task start root:list
 
   # Get browser info
-  deno task start endpoint:info --endpoint chrome
+  deno task start endpoint:info -e chrome
 
-  # Launch browser with profile
-  deno task start context:create --endpoint chrome --context Agent
+  # Launch browser with profile (JSON body for options)
+  deno task start context:create -e chrome -c Agent '{"headless":false}'
 
   # Launch headless
-  deno task start context:create --endpoint chrome --context Agent --headless
+  deno task start context:create -e chrome -c Agent '{"headless":true}'
 
   # Get targets in context
-  deno task start context:info --endpoint chrome --context Agent
+  deno task start context:info -e chrome -c Agent
 
   # Navigate a target
-  deno task start target:control --endpoint chrome --context Agent --target <id> --navigate https://example.com
+  deno task start target:control -e chrome -c Agent -t <id> '{"navigate":"https://example.com"}'
+
+  # Click an element
+  deno task start node:interact -e chrome -c Agent -t <id> -n <nodeId> '{"click":true}'
 
   # Close browser instance
-  deno task start context:close --endpoint chrome --context Agent
+  deno task start context:close -e chrome -c Agent
 `;
 
 ((globalThis as Record<string, unknown>).cli = CLI.create(

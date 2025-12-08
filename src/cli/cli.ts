@@ -1,488 +1,552 @@
 /**
- * Contract-driven CLI
+ * Contract-driven CLI (v2)
+ *
+ * All commands are class members with type-tight return types.
+ * Uses src/client library classes directly (not miniclient).
  *
  * Commands are derived from contract names (e.g., "endpoint:info", "context:create").
- * The colon separator prevents conflicts with built-in commands like help, serve, mcp.
- *
- * Uses the hierarchical client architecture:
- * - Endpoint: /:endpoint (browser type OR host)
- * - Context: /:endpoint/:context (profile OR port)
- * - Target: /:endpoint/:context/:target (tab/page)
- * - Node: /:endpoint/:context/:target/:node (DOM node)
+ * The colon separator prevents conflicts with built-in commands like help, serve.
  */
 
 import { Server } from "../orchestrator/server/mod.ts";
 import { Controller } from "./spawn.ts";
-import { Endpoint, Context, Target, Node, Client } from "../client/mod.ts";
+import { Root, Endpoint, Context, Target, Node } from "../client/mod.ts";
 import { MCPServer } from "../mcp/mod.ts";
-import { contracts, Root } from "../orchestrator/contracts/api.ts";
-import type * as API from "../orchestrator/contracts/api.ts";
+import { contracts } from "../orchestrator/contracts/api.ts";
+import * as API from "../orchestrator/contracts/api.ts";
+import {
+  type ICLI,
+  type FlagMap,
+  type ParsedArgs,
+  type ContractInfo,
+  type LongFlag,
+  SHORT_FLAGS,
+} from "./types.ts";
 
-type CommandDescriptor = {
-  requires: string[];
-  depends: string[];
-}
+import type {
+  JSONPrimitive,
+  JSONSerializable,
+} from "../orchestrator/schema.ts";
 
-type RootCommands = {
-  "root":         CommandDescriptor;
-  "root:health":  CommandDescriptor;
-  "root:list":    CommandDescriptor;
-  "root:killAll": CommandDescriptor;
-}
-type TestRootCommands = API.Root.AssertBinding<RootCommands>;
-type EndpointCommands = {
-  "endpoint":         CommandDescriptor;
-  "endpoint:exists":  CommandDescriptor;
-  "endpoint:info":    CommandDescriptor;
-  "endpoint:launch":  CommandDescriptor;
-  "endpoint:killAll": CommandDescriptor;
-}
-type TestEndpointCommands = API.Endpoint.AssertBinding<EndpointCommands>;
-type ContextCommands = {
-  "context":        CommandDescriptor;
-  "context:exists": CommandDescriptor;
-  "context:info":   CommandDescriptor;
-  "context:create": CommandDescriptor;
-  "context:close":  CommandDescriptor;
-}
-type TestContextCommands = API.Context.AssertBinding<ContextCommands>;
-type TargetCommands = {
-  "target":           CommandDescriptor;
-  "target:exists":    CommandDescriptor;
-  "target:info":      CommandDescriptor;
-  "target:cdp":       CommandDescriptor;
-  "target:control":   CommandDescriptor;
-  "target:content":   CommandDescriptor;
-  "target:emulate":   CommandDescriptor;
-  "target:throttle":  CommandDescriptor;
-  "target:intercept": CommandDescriptor;
-  "target:label":     CommandDescriptor;
-  "target:create":    CommandDescriptor;
-  "target:close":     CommandDescriptor;
-}
-type TestTargetCommands = API.Target.AssertBinding<TargetCommands>;
-type NodeCommands = {
-  "node":          CommandDescriptor;
-  "node:exists":   CommandDescriptor;
-  "node:info":     CommandDescriptor;
-  "node:create":   CommandDescriptor;
-  "node:replace":  CommandDescriptor;
-  "node:interact": CommandDescriptor;
-  "node:remove":   CommandDescriptor;
-}
-type TestNodeCommands = API.Node.AssertBinding<NodeCommands>;
-type AllCommands =
-  & RootCommands
-  & EndpointCommands
-  & ContextCommands
-  & TargetCommands
-  & NodeCommands;
-
-// Path parameter names extracted from contract paths
-const PATH_PARAMS = ["endpoint", "context", "target", "node"] as const;
-type PathParam = (typeof PATH_PARAMS)[number];
-
-interface ICLI {
-  location: string;
-  version: string;
-  usage: string;
-  flags: Record<string, string>;
-  help(): string;
-  command: string;
-  args: string[];
-  parse(args: string[]): Record<string, string>;
-}
+// Reverse mapping: short flag -> long flag
+const LONG_FLAGS: Record<string, LongFlag> = Object.fromEntries(
+  Object.entries(SHORT_FLAGS).map(([long, short]) => [short, long as LongFlag])
+);
 
 export class CLI implements ICLI {
-  static #instance: CLI | null = null;
-  static create(location: string, version: string, usage: string): CLI {
-    if (CLI.#instance)
-      throw new Error("CLI instance is a singleton and already exists.");
+  // ==========================================================================
+  // Static Parse Method (settable)
+  // ==========================================================================
 
-    return (CLI.#instance = new CLI(location, version, usage));
-  }
-  static get instance(): CLI {
-    if (!this.#instance) throw new Error("CLI instance not created yet.");
-    return this.#instance;
-  }
-  private constructor(location: string, version: string, usage: string) {
-    this.location = location;
-    this.version = version;
-    this.usage = usage;
+  static parse: (args: string[]) => ParsedArgs = function (args: string[]): ParsedArgs {
+    const flags: FlagMap = {};
+    const remaining: JSONPrimitive[] = [];
+    let command: string | undefined;
 
-    this.flags = this.parse(this.args);
+    for(let i = 0; i < args.length; i++) {
+      const arg = args[i];
 
-    this.#controller = Controller.create(location);
-  }
-
-  static #expand(
-    input: string,
-    lookup: (name: string) => string | undefined,
-    { required = true } = {}
-  ): string {
-    return input.replace(/\$([A-Za-z0-9_]+)|\$\{([^}]+)\}/g, (_, a, b) => {
-      const name = a ?? b;
-      const val = lookup(name);
-
-      if (val === undefined) {
-        if (required) throw new Error(`Missing required variable ${name}`);
-        return "";
+      // First non-flag argument is the command
+      if (!command && !arg.startsWith("-")) {
+        command = arg;
+        continue;
       }
 
-      return val;
-    });
-  }
-  static expand(input: string, vars?: Record<string, string>): string {
-    return this.#expand(input, (name) => {
-      if (vars && name in vars) return vars[name];
-      return Deno.env.get(name);
-    });
-  }
-  static exists(
-    type: "file" | "directory",
-    path: string,
-    evaluate = false,
-    vars?: Record<string, string>
-  ): boolean {
-    const expanded = evaluate ? this.expand(path, vars) : path;
-    try {
-      const stat = Deno.statSync(expanded);
-      if (!stat) return false;
+      // Long flag: --name, --name value, or --name=value
+      if (arg.startsWith("--")) {
+        const eqIdx = arg.indexOf("=");
+        if (eqIdx > 0) {
+          const name = arg.slice(2, eqIdx) as LongFlag;
+          flags[name] = arg.slice(eqIdx + 1);
+        } else {
+          const name = arg.slice(2) as LongFlag;
+          const next = args[i + 1];
+          if (!next || next.startsWith("-")) {
+            flags[name] = true;
+          } else {
+            flags[name] = next;
+            i++;
+          }
+        }
+        continue;
+      }
 
-      return type === "file" ? stat.isFile : stat.isDirectory;
-    } catch {
-      return false;
+      // Short flag: -x, -x value, or combined -xyz
+      if (arg.startsWith("-")) {
+        if (arg.length === 2) {
+          const shortFlag = arg.slice(1);
+          const longFlag = LONG_FLAGS[shortFlag];
+          const name = longFlag ?? (shortFlag as LongFlag);
+          const next = args[i + 1];
+          if (!next || next.startsWith("-")) {
+            flags[name] = true;
+          } else {
+            flags[name] = next;
+            i++;
+          }
+        } else {
+          for (const char of arg.slice(1)) {
+            const longFlag = LONG_FLAGS[char];
+            const name = longFlag ?? (char as LongFlag);
+            flags[name] = true;
+          }
+        }
+        continue;
+      }
+
+      remaining.push(arg);
+    }
+
+    let json: JSONSerializable | undefined;
+    for (let i = 0; i < remaining.length; i++) {
+      const arg = remaining[i];
+      try {
+        const parsed = JSON.parse(arg as string);
+        switch (typeof parsed) {
+          case "number":
+          case "boolean":
+          case "string":
+            remaining[i] = parsed;
+            continue;
+          case "undefined":
+            // remove undefined
+            remaining.splice(i, 1);
+            i--;
+            continue;
+          default:
+            if (!json) {
+              remaining.splice(i, 1);
+              i--;
+              json = parsed;
+            }
+        }
+      } catch {
+        // not JSON, continue
+      }
+    }
+    return {
+      command, flags, remaining, json
     }
   }
 
-  readonly location: string;
-  readonly version: string;
-  readonly usage: string;
+  // ==========================================================================
+  // Singleton Pattern
+  // ==========================================================================
 
-  readonly args: string[] = Deno.args;
-  readonly command: string = Deno.args[0];
-  readonly flags: Record<string, string>;
+  static #instance: CLI | null = null;
 
-  #controller: Controller;
+  static create(location: string, version: string, usage: string): CLI {
+    if (CLI.#instance) {
+      throw new Error("CLI instance is a singleton and already exists.");
+    }
+    return (CLI.#instance = new CLI(location, version, usage));
+  }
 
-  /** Get required flag or throw */
-  #require(name: PathParam): string {
+  static get instance(): CLI {
+    if (!this.#instance) {
+      throw new Error("CLI instance not created yet.");
+    }
+    return this.#instance;
+  }
+
+  // ==========================================================================
+  // Instance Properties
+  // ==========================================================================
+
+  readonly #location: string;
+  readonly #version: string;
+  readonly #usage: string;
+  readonly #controller: Controller;
+
+  #cached: ParsedArgs | null = null;
+
+  private constructor(location: string, version: string, usage: string) {
+    this.#location = location;
+    this.#version = version;
+    this.#usage = usage;
+    this.#controller = Controller.create(location);
+  }
+
+  // ==========================================================================
+  // Lazy Getters
+  // ==========================================================================
+
+  get #parsed(): ParsedArgs {
+    return (this.#cached ??= CLI.parse(Deno.args));
+  }
+
+  get flags(): FlagMap {
+    return this.#parsed.flags;
+  }
+
+  get #command(): string | undefined {
+    return this.#parsed.command;
+  }
+
+  get #json(): JSONSerializable | undefined {
+    return this.#parsed.json;
+  }
+
+  // ==========================================================================
+  // Public Getters (Commands)
+  // ==========================================================================
+
+  get version(): string {
+    return this.#version;
+  }
+
+  get location(): string {
+    return this.#location;
+  }
+
+  // ==========================================================================
+  // Helper Methods
+  // ==========================================================================
+
+  /** Get required flag value or throw */
+  #require(name: LongFlag): string {
     const value = this.flags[name];
-    if (!value) {
+    if (value === undefined || value === true || value === false) {
       throw new Error(`Missing required flag --${name}`);
     }
     return value;
   }
 
-  /** Build request body from flags (excluding path params and built-in flags) */
-  #buildRequest(
-    excludeParams: PathParam[] = []
-  ): Record<string, unknown> | undefined {
-    const request: Record<string, unknown> = {};
-    const excluded = new Set<string>([
-      ...excludeParams,
-      "help",
-      "h",
-      "server",
-      "port",
-      "parent-pid",
-      "api-url",
-    ]);
-
-    for (const [key, value] of Object.entries(this.flags)) {
-      if (excluded.has(key)) continue;
-
-      // Parse value types
-      if (value === "" || value === "true") {
-        request[key] = true;
-      } else if (value === "false") {
-        request[key] = false;
-      } else if (!isNaN(Number(value)) && value !== "") {
-        request[key] = Number(value);
-      } else {
-        request[key] = value;
-      }
-    }
-
-    return Object.keys(request).length > 0 ? request : undefined;
+  /** Get optional flag value as string */
+  #optional(name: LongFlag): string | undefined {
+    const value = this.flags[name];
+    if (value === undefined || typeof value === "boolean") return undefined;
+    return value;
   }
 
-  /** Get the endpoint client */
-  #getEndpoint(): Endpoint {
-    const endpointName = this.#require("endpoint");
-    return new Endpoint(endpointName);
+  /** Check if flag is present (boolean) */
+  #has(name: LongFlag): boolean {
+    return this.flags[name] !== undefined;
   }
 
-  /** Get the context client */
+  // ==========================================================================
+  // Client Getters
+  // ==========================================================================
+
+  #server?: Awaited<ReturnType<Controller["ensure"]>>;
+  async #ensure(): Promise<void> {
+    if (!this.#server)
+      this.#server = await this.#controller.ensure();
+  }
+
+  async #getRoot(): Promise<Root> {
+    await this.#ensure();
+    const serverUrl = this.#optional("server") ?? "http://localhost:9333";
+    return new Root(serverUrl);
+  }
+
+  async #getEndpoint(): Promise<Endpoint> {
+    const root = await this.#getRoot();
+    const name = this.#require("endpoint");
+    return new Endpoint(root, name);
+  }
+
   async #getContext(): Promise<Context> {
-    const endpoint = this.#getEndpoint();
-    const contextName = this.#require("context");
-    return await endpoint.context(contextName);
+    const endpoint = await this.#getEndpoint();
+    const name = this.#require("context");
+    return new Context(endpoint, name);
   }
 
-  /** Get or create target client */
-  #getTarget(): Target {
-    const endpoint = this.#getEndpoint();
-    const contextName = this.#require("context");
+  async #getTarget(): Promise<Target> {
+    const context = await this.#getContext();
     const targetId = this.#require("target");
-    // Build target directly without creating context
-    const context = new Client(endpoint, contextName);
     return new Target(context, targetId);
   }
 
-  /** Get node client */
-  #getNode(): Node {
-    const target = this.#getTarget();
+  async #getNode(): Promise<Node> {
+    const target = await this.#getTarget();
     const nodeId = parseInt(this.#require("node"));
     return new Node(target, nodeId);
   }
 
-  /** Execute root-level commands */
-  async #executeRoot(action: string): Promise<unknown> {
-    const { health, list, killAll } = Root.miniclient();
+  // ==========================================================================
+  // Root Contract Commands
+  // ==========================================================================
 
-    switch (action) {
-      case "health":
-        return await health(Endpoint.server);
-      case "list":
-        return await list(Endpoint.server);
-      case "killAll":
-        return await killAll(Endpoint.server);
-      default:
-        throw new Error(`Unknown root action: ${action}`);
+  async "root:health"(): Promise<void> {
+    const root = await this.#getRoot();
+    const healthy = await root.health();
+    if (!healthy) {
+      throw new Error("Server health check failed");
     }
   }
 
-  /** Execute endpoint-level commands */
-  async #executeEndpoint(action: string): Promise<unknown> {
-    const endpoint = this.#getEndpoint();
-
-    switch (action) {
-      case "exists":
-        return { exists: await endpoint.exists() };
-      case "info":
-        return await endpoint.info();
-      case "launch": {
-        const headless = "headless" in this.flags;
-        const port = this.flags.port ? parseInt(this.flags.port) : undefined;
-        return await endpoint.launch({ headless, port });
-      }
-      case "killAll":
-        return await endpoint.killAll();
-      default:
-        throw new Error(`Unknown endpoint action: ${action}`);
-    }
+  async "root:list"(): Promise<API.Root.ListResponse> {
+    const root = await this.#getRoot();
+    return await root.list();
   }
 
-  /** Execute context-level commands */
-  async #executeContext(action: string): Promise<unknown> {
-    switch (action) {
-      case "exists": {
-        const endpoint = this.#getEndpoint();
-        const contextName = this.#require("context");
-        const context = new Client(endpoint, contextName);
-        return { exists: await context.alive() };
-      }
-      case "info": {
-        const context = await this.#getContext();
-        return await context.info();
-      }
-      case "create": {
-        const headless = "headless" in this.flags;
-        const port = this.flags.port ? parseInt(this.flags.port) : undefined;
-        const context = await this.#getContext();
-        // Context.create already launches if not exists
-        return { created: true, context: context.context, headless, port };
-      }
-      case "close": {
-        const context = await this.#getContext();
-        await context.close();
-        return { closed: true };
-      }
-      default:
-        throw new Error(`Unknown context action: ${action}`);
-    }
+  async "root:killAll"(): Promise<API.Root.KillAllResponse> {
+    const root = await this.#getRoot();
+    return await root.killAll();
   }
 
-  /** Execute target-level commands */
-  async #executeTarget(action: string): Promise<unknown> {
-    const target = this.#getTarget();
+  // ==========================================================================
+  // Endpoint Contract Commands
+  // ==========================================================================
 
-    switch (action) {
-      case "exists":
-        return { exists: await target.exists() };
-      case "info": {
-        const xpath = this.flags.xpath;
-        const css = this.flags.css;
-        return await target.info(xpath || css ? { xpath, css } : undefined);
-      }
-      case "cdp":
-        return { webSocketDebuggerUrl: await target.cdp() };
-      case "control": {
-        const request = this.#buildRequest(["endpoint", "context", "target"]);
-        if (!request) throw new Error("No control action specified");
-        return await target.control(request);
-      }
-      case "content": {
-        const request = this.#buildRequest(["endpoint", "context", "target"]);
-        if (!request) throw new Error("No content action specified");
-        return await target.content(request);
-      }
-      case "emulate": {
-        const request = this.#buildRequest(["endpoint", "context", "target"]);
-        if (!request) throw new Error("No emulation settings specified");
-        return await target.emulate(request);
-      }
-      case "throttle": {
-        const request = this.#buildRequest(["endpoint", "context", "target"]);
-        if (!request) throw new Error("No throttle settings specified");
-        return await target.throttle(request);
-      }
-      case "intercept": {
-        const request = this.#buildRequest(["endpoint", "context", "target"]);
-        if (!request) throw new Error("No intercept rules specified");
-        return await target.intercept(request);
-      }
-      case "label": {
-        const request = this.#buildRequest(["endpoint", "context", "target"]);
-        if (!request) throw new Error("No label data specified");
-        return await target.label(request);
-      }
-      case "create": {
-        const url = this.flags.url;
-        if (!url) throw new Error("Missing required flag --url");
-        const endpoint = this.#getEndpoint();
-        const contextName = this.#require("context");
-        const context = await endpoint.context(contextName);
-        const newTarget = await context.target(url);
-        if (!newTarget) throw new Error("Failed to create target");
-        return { id: newTarget.id, url };
-      }
-      case "close":
-        await target.close();
-        return { closed: true };
-      default:
-        throw new Error(`Unknown target action: ${action}`);
-    }
+  async "endpoint:exists"(): Promise<boolean> {
+    const endpoint = await this.#getEndpoint();
+    return await endpoint.exists();
   }
 
-  /** Execute node-level commands */
-  async #executeNode(action: string): Promise<unknown> {
-    const node = this.#getNode();
-
-    switch (action) {
-      case "exists":
-        return { exists: await node.exists() };
-      case "info": {
-        const children = "children" in this.flags;
-        const depth = this.flags.depth
-          ? parseInt(this.flags.depth)
-          : undefined;
-        return await node.info(
-          children || depth ? { children, depth } : undefined
-        );
-      }
-      case "create": {
-        const request = this.#buildRequest([
-          "endpoint",
-          "context",
-          "target",
-          "node",
-        ]);
-        if (!request) throw new Error("No create data specified");
-        return await node.create(request);
-      }
-      case "replace": {
-        const request = this.#buildRequest([
-          "endpoint",
-          "context",
-          "target",
-          "node",
-        ]);
-        if (!request) throw new Error("No replace data specified");
-        return await node.replace(request);
-      }
-      case "interact": {
-        const request = this.#buildRequest([
-          "endpoint",
-          "context",
-          "target",
-          "node",
-        ]);
-        if (!request) throw new Error("No interact action specified");
-        return await node.interact(request);
-      }
-      case "remove":
-        await node.remove();
-        return { removed: true };
-      default:
-        throw new Error(`Unknown node action: ${action}`);
-    }
+  async "endpoint:info"(): Promise<API.Endpoint.InfoResponse> {
+    const endpoint = await this.#getEndpoint();
+    const body = this.#json as API.Endpoint.InfoRequest | undefined;
+    return await endpoint.info(body ?? {});
   }
 
-  /** Execute a contract command using hierarchical clients */
-  async #executeContract(command: string): Promise<unknown> {
-    // Ensure server is running
-    await this.#controller.ensure();
-
-    // Configure server URL
-    const serverUrl = this.flags.server ?? "http://localhost:9333";
-    Endpoint.configure(serverUrl);
-
-    // Parse command: namespace:action
-    const [namespace, action] = command.split(":");
-    if (!action) {
-      throw new Error(`Invalid command format: ${command}`);
-    }
-
-    switch (namespace) {
-      case "root":
-        return await this.#executeRoot(action);
-      case "endpoint":
-        return await this.#executeEndpoint(action);
-      case "context":
-        return await this.#executeContext(action);
-      case "target":
-        return await this.#executeTarget(action);
-      case "node":
-        return await this.#executeNode(action);
-      default:
-        throw new Error(`Unknown namespace: ${namespace}`);
-    }
+  async "endpoint:launch"(): Promise<API.Endpoint.LaunchResponse> {
+    const endpoint = await this.#getEndpoint();
+    const body = this.#json as API.Endpoint.LaunchRequest | undefined;
+    return await endpoint.launch(body ?? { headless: false });
   }
 
-  async #main(): Promise<unknown> {
-    if ("help" in this.flags || "h" in this.flags) return this.help();
-
-    if (!this.command || this.command.startsWith("-")) return this.help();
-
-    // Check if it's a contract command (contains colon)
-    if (this.command.includes(":")) {
-      return await this.#executeContract(this.command);
-    }
-
-    // Built-in commands
-    switch (this.command) {
-      case "help":
-        return this.help();
-      case "version":
-        return this.version;
-      case "serve":
-        return await this.serve();
-      case "mcp":
-        return await this.mcp();
-      case "contracts":
-        return this.contracts();
-      default:
-        throw new Error(
-          `Unknown command: ${this.command}. Use --help for usage.`
-        );
-    }
+  async "endpoint:killAll"(): Promise<API.Endpoint.KillAllResponse> {
+    const endpoint = await this.#getEndpoint();
+    return await endpoint.killAll();
   }
+
+  // ==========================================================================
+  // Context Contract Commands
+  // ==========================================================================
+
+  async "context:exists"(): Promise<boolean> {
+    const context = await this.#getContext();
+    return await context.exists();
+  }
+
+  async "context:info"(): Promise<API.Context.InfoResponse> {
+    const context = await this.#getContext();
+    return await context.info();
+  }
+
+  async "context:create"(): Promise<API.Context.CreateResponse> {
+    const context = await this.#getContext();
+    const body = this.#json as API.Context.CreateRequest | undefined;
+
+    // Create context using the context client directly
+    const created = await context.create(body ?? { headless: false });
+
+    // Get info to return proper response
+    if (created) {
+      const info = await context.info();
+      return { ...info, created: true } as API.Context.CreateResponse;
+    }
+
+    // Context already existed, return info
+    const info = await context.info();
+    return { ...info, created: false } as API.Context.CreateResponse;
+  }
+
+  async "context:close"(): Promise<void> {
+    const context = await this.#getContext();
+    await context.close();
+  }
+
+  // ==========================================================================
+  // Target Contract Commands
+  // ==========================================================================
+
+  async "target:exists"(): Promise<boolean> {
+    const target = await this.#getTarget();
+    return await target.exists();
+  }
+
+  async "target:info"(): Promise<API.Target.InfoResponse> {
+    const target = await this.#getTarget();
+    const body = this.#json as API.Target.InfoRequest | undefined;
+    return await target.info(body ?? {});
+  }
+
+  async "target:cdp"(): Promise<API.Target.CdpResponse> {
+    const target = await this.#getTarget();
+    return await target.cdp();
+  }
+
+  async "target:control"(): Promise<API.Target.ControlResponse> {
+    const target = await this.#getTarget();
+    const body = this.#json as API.Target.ControlRequest | undefined;
+    if (!body) throw new Error("No control action specified (provide JSON body)");
+    return await target.control(body);
+  }
+
+  async "target:create"(): Promise<API.Target.CreateResponse> {
+    const target = await this.#getTarget();
+    const body = this.#json as API.Target.CreateRequest | undefined;
+    if (!body?.url) throw new Error("Missing required 'url' in JSON body");
+    return await target.create(body);
+  }
+
+  async "target:content"(): Promise<API.Target.ContentResponse> {
+    const target = await this.#getTarget();
+    const body = this.#json as API.Target.ContentRequest | undefined;
+    if (!body) throw new Error("No content action specified (provide JSON body)");
+    return await target.content(body);
+  }
+
+  async "target:emulate"(): Promise<API.Target.EmulateResponse> {
+    const target = await this.#getTarget();
+    const body = this.#json as API.Target.EmulateRequest | undefined;
+    if (!body) throw new Error("No emulation settings specified (provide JSON body)");
+    return await target.emulate(body);
+  }
+
+  async "target:throttle"(): Promise<API.Target.ThrottleResponse> {
+    const target = await this.#getTarget();
+    const body = this.#json as API.Target.ThrottleRequest | undefined;
+    if (!body) throw new Error("No throttle settings specified (provide JSON body)");
+    return await target.throttle(body);
+  }
+
+  async "target:intercept"(): Promise<API.Target.InterceptResponse> {
+    const target = await this.#getTarget();
+    const body = this.#json as API.Target.InterceptRequest | undefined;
+    if (!body) throw new Error("No intercept rules specified (provide JSON body)");
+    return await target.intercept(body);
+  }
+
+  async "target:label"(): Promise<API.Target.LabelResponse> {
+    const target = await this.#getTarget();
+    const body = this.#json as API.Target.LabelRequest | undefined;
+    if (!body) throw new Error("No label data specified (provide JSON body)");
+    return await target.label(body);
+  }
+
+  async "target:close"(): Promise<void> {
+    const target = await this.#getTarget();
+    await target.close();
+  }
+
+  // ==========================================================================
+  // Node Contract Commands
+  // ==========================================================================
+
+  async "node:exists"(): Promise<boolean> {
+    const node = await this.#getNode();
+    return await node.exists();
+  }
+
+  async "node:info"(): Promise<API.Node.InfoResponse> {
+    const node = await this.#getNode();
+    const body = this.#json as API.Node.InfoRequest | undefined;
+    return await node.info(body ?? {});
+  }
+
+  async "node:create"(): Promise<API.Node.CreateResponse> {
+    const node = await this.#getNode();
+    const body = this.#json as API.Node.CreateRequest | undefined;
+    if (!body) throw new Error("No create data specified (provide JSON body)");
+    const created = await node.create(body);
+    // The created node returns info via the Node class
+    return await created.info() as unknown as API.Node.CreateResponse;
+  }
+
+  async "node:replace"(): Promise<API.Node.ReplaceResponse> {
+    const node = await this.#getNode();
+    const body = this.#json as API.Node.ReplaceRequest | undefined;
+    if (!body) throw new Error("No replace data specified (provide JSON body)");
+    return await node.replace(body);
+  }
+
+  async "node:interact"(): Promise<API.Node.InteractResponse> {
+    const node = await this.#getNode();
+    const body = this.#json as API.Node.InteractRequest | undefined;
+    if (!body) throw new Error("No interact action specified (provide JSON body)");
+    return await node.interact(body);
+  }
+
+  async "node:remove"(): Promise<void> {
+    const node = await this.#getNode();
+    await node.remove();
+  }
+
+  // ==========================================================================
+  // Additional Commands
+  // ==========================================================================
+
+  help(): Promise<string> {
+    const command = this.#parsed.remaining[0];
+    if (!command) {
+      return Promise.resolve(this.#usage);
+    }
+
+    // Find contract by name
+    const contract = contracts.find((c) => c.name === command);
+    if (!contract) {
+      return Promise.resolve(`Unknown command: ${command}\n\nUse 'help' to see all available commands.`);
+    }
+
+    let helpText = `${contract.name} - ${contract.description}\n\n`;
+    helpText += `Method: ${contract.method}\n`;
+    helpText += `Path: ${contract.path}\n`;
+
+    // Extract path params from path
+    const pathParams = contract.path.match(/:(\w+)/g);
+    if (pathParams && pathParams.length > 0) {
+      helpText += `\nPath parameters (required):\n`;
+      for (const param of pathParams) {
+        const name = param.slice(1);
+        const shortFlag = SHORT_FLAGS[name as keyof typeof SHORT_FLAGS];
+        helpText += `  -${shortFlag}, --${name}\n`;
+      }
+    }
+
+    if ("request" in contract && contract.request) {
+      helpText += `\nRequest body (JSON):\n`;
+      const props = (contract.request as { properties?: Record<string, unknown> }).properties;
+      if (props) {
+        helpText += `  { ${Object.keys(props).join(", ")} }\n`;
+      }
+    }
+
+    return Promise.resolve(helpText);
+  }
+
+  usage(): Promise<string> {
+    return this.help();
+  }
+
+  contracts(): Promise<ContractInfo[]> {
+    return Promise.resolve(contracts.map((c) => ({
+      name: c.name,
+      description: c.description,
+      method: c.method,
+      path: c.path,
+      hasRequest: "request" in c,
+      hasResponse: "response" in c,
+    })));
+  }
+
+  async "serve:rest"(): Promise<void> {
+    const _port = this.#optional("port");
+    const _pid = this.#optional("parent-pid" as LongFlag);
+    
+    const host = this.#optional("host") ?? "localhost";
+    const port = _port ? parseInt(_port) : 9333;
+    const pid = _pid ? parseInt(_pid) : undefined;
+
+    await Server.create({ port, pid, hostname: host }).start();
+  }
+
+  async "serve:mcp"(): Promise<void> {
+    const apiUrl = this.#optional("server");
+    const server = new MCPServer({ apiUrl });
+    await server.run();
+  }
+
+  // ==========================================================================
+  // Main Entry Point
+  // ==========================================================================
 
   async main(): Promise<void> {
     try {
-      const result = await this.#main();
+      const result = await this.#dispatch();
       if (result !== undefined) {
         if (typeof result === "string") {
           console.log(result);
@@ -496,73 +560,40 @@ export class CLI implements ICLI {
     }
   }
 
-  help(): string {
-    return this.usage;
-  }
-
-  parse(args: string[]): Record<string, string> {
-    const flags: Record<string, string> = {};
-
-    for (let i = 0; i < args.length; i++) {
-      const arg = args[i];
-
-      if (arg.startsWith("--")) {
-        const eqIdx = arg.indexOf("=");
-        if (eqIdx > 0) {
-          flags[arg.slice(2, eqIdx)] = arg.slice(eqIdx + 1);
-        } else {
-          const next = args[i + 1];
-          // If no next arg or next arg is a flag, treat as boolean
-          if (!next || next.startsWith("-")) {
-            flags[arg.slice(2)] = "";
-          } else {
-            flags[arg.slice(2)] = next;
-            i++;
-          }
-        }
-      } else if (arg.startsWith("-") && arg.length === 2) {
-        const next = args[i + 1];
-        if (!next || next.startsWith("-")) {
-          flags[arg.slice(1)] = "";
-        } else {
-          flags[arg.slice(1)] = next;
-          i++;
-        }
-      }
+  async #dispatch(): Promise<unknown> {
+    // Help flag takes precedence
+    if (this.#has("help")) {
+      return console.error(await this.help());
     }
-    return flags;
-  }
 
-  /** List all available contract commands */
-  contracts(): {
-    contracts: {
-      name: string;
-      method: string;
-      path: string;
-      description: string;
-    }[];
-  } {
-    return {
-      contracts: contracts.map((c) => ({
-        name: c.name,
-        method: c.method,
-        path: c.path,
-        description: c.description,
-      })),
-    };
-  }
+    // No command or command starts with dash -> show help
+    if (!this.#command || this.#command.startsWith("-")) {
+      return console.error(await this.help());
+    }
 
-  async serve(): Promise<void> {
-    const port = this.flags.port ? parseInt(this.flags.port) : undefined;
-    const pid = this.flags["parent-pid"]
-      ? parseInt(this.flags["parent-pid"])
-      : undefined;
-    await Server.create({ port, pid }).start();
-  }
+    const cmd = this.#command;
 
-  async mcp(): Promise<void> {
-    const apiUrl = this.flags["api-url"];
-    const server = new MCPServer({ apiUrl });
-    await server.run();
+    if (cmd === "help" || cmd === "usage") {
+      return console.error(await this.help());
+    }
+
+    // Blacklist private members and internal methods
+    if (cmd.startsWith("#") || cmd.startsWith("_")) {
+      throw new Error(`Unknown command: ${cmd}. Use --help for usage.`);
+    }
+
+    // Look up the member on the CLI instance
+    const member = this[cmd as keyof this];
+    if (member === undefined) {
+      throw new Error(`Unknown command: ${cmd}. Use --help for usage.`);
+    }
+
+    // If it's a function, call it
+    if (typeof member === "function") {
+      return await (member as () => Promise<unknown>).call(this);
+    }
+
+    // Otherwise return the value directly (e.g., version, location)
+    return member as JSONSerializable;
   }
 }
