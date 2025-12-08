@@ -1,6 +1,7 @@
 import * as API from "../orchestrator/contracts/api.ts";
 
 type TailParameters<Func> =
+  // deno-lint-ignore no-explicit-any
   Func extends (first: any, ...args: infer P) => any ? P : never;
 
 export type IRootCLI = API.Root.Binding;
