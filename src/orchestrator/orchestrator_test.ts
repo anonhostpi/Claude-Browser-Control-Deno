@@ -2142,10 +2142,18 @@ export class Client {
 `;
   await Deno.writeTextFile(`${clientDir}/client.ts`, clientCode);
 
-  // Copy schema.ts to temp directory for FromSchema import
+  // Copy schema.ts to parent directory (transpiled contracts.ts imports from "../schema.ts")
   const schemaSource = new URL("./schema.ts", import.meta.url);
   const schemaContent = await Deno.readTextFile(schemaSource);
-  await Deno.writeTextFile(`${tempDir}/schema.ts`, schemaContent);
+  await Deno.writeTextFile(`${parentDir}/schema.ts`, schemaContent);
+
+  // Create deno.json in parent directory with import map for json-schema-to-ts (needed by schema.ts)
+  const denoJson = {
+    imports: {
+      "json-schema-to-ts": "npm:json-schema-to-ts@^3.1.1",
+    },
+  };
+  await Deno.writeTextFile(`${parentDir}/deno.json`, JSON.stringify(denoJson, null, 2));
 
   try {
     // Transpile to TypeScript
@@ -2153,7 +2161,7 @@ export class Client {
 
     // Create a test file that uses the generated types with FromSchema
     const testCode = `
-import { FromSchema } from "./schema.ts";
+import { FromSchema } from "../schema.ts";
 import { contracts } from "./contracts.ts";
 
 // Extract the response schema type from the first contract
@@ -2192,9 +2200,19 @@ export { validResponse };
     assertEquals(code, 0);
   } finally {
     await Deno.remove(tempDir, { recursive: true });
-    // Clean up client directory in parent temp folder
+    // Clean up files in parent temp folder
     try {
       await Deno.remove(clientDir, { recursive: true });
+    } catch {
+      // Ignore if already removed
+    }
+    try {
+      await Deno.remove(`${parentDir}/schema.ts`);
+    } catch {
+      // Ignore if already removed
+    }
+    try {
+      await Deno.remove(`${parentDir}/deno.json`);
     } catch {
       // Ignore if already removed
     }

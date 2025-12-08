@@ -1,4 +1,5 @@
 import { Hono, Handler, Context } from "hono";
+import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { upgradeWebSocket } from "hono/deno";
 import { EndpointContract, Method } from "../contract.ts";
 import { JSONSchema } from "../schema.ts";
@@ -229,10 +230,12 @@ class RouteBuilder extends Map<string, RouteBuilder> {
               throw new InvalidResponseError(output);
             return context.json(output); // Hono gracefully handles HEAD response writes. We don't need to do anything special here.
           } catch (err) {
-            if (assert.error && assert.error(err))
-              return context.json(err, (err as any).status || 500);
-            else
+            if (assert.error && assert.error(err)) {
+              const status = (err as { status?: number }).status ?? 500;
+              return context.json(err, status as ContentfulStatusCode);
+            } else {
               throw err;
+            }
           }
         })
       }
