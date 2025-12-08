@@ -2,6 +2,7 @@ import { Method } from "../contract.ts";
 
 export interface HasUrl {
   url: string;
+  path?: string;
 }
 
 export class Client implements HasUrl {
@@ -24,10 +25,11 @@ export class Client implements HasUrl {
     const base = parentUrl.endsWith("/") ? parentUrl : parentUrl + "/";
     return this.#path ? new URL(this.#path, base).href : parentUrl;
   }
-  set url(value: string) {
-    this.#url = value;
-    this.#parent = undefined;
-    this.#path = undefined;
+
+  get path(): string {
+    if (this.#parent?.path)
+      return [this.#parent.path, this.#path].filter(Boolean).join("/");
+    return this.#path ?? "";
   }
 
   #full(path?: string): string {
