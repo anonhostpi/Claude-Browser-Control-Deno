@@ -3,8 +3,10 @@
  * Ensures server is running, spawning if necessary
  */
 
-import { Client } from "./client.ts";
-import { DEFAULT_SERVER_PORT } from "../server/mod.ts";
+import { Endpoint } from "../client/mod.ts";
+
+const DEFAULT_SERVER_PORT = 9333;
+const DEFAULT_SERVER_HOSTNAME = "127.0.0.1";
 
 export interface SpawnOptions {
   port?: number;
@@ -54,10 +56,10 @@ export class Controller {
 
     return cmd.spawn();
   }
-  async await(client: Client, timeout: number): Promise<boolean> {
+  async await(timeout: number): Promise<boolean> {
     const start = Date.now();
     while (Date.now() - start < timeout) {
-      if (await client.isAlive())
+      if (await Endpoint.server.alive())
         return true;
       await new Promise((r) => setTimeout(r, 100));
     }
@@ -66,19 +68,21 @@ export class Controller {
   async ensure(
     { port = DEFAULT_SERVER_PORT, timeout = 5000 }: SpawnOptions = {}
   ): Promise<{
-    client: Client;
+    server: string;
     process?: Deno.ChildProcess;
   }> {
-    const client = new Client({ port });
-    if (await client.isAlive())
-      return { client };
+    const server = `http://${DEFAULT_SERVER_HOSTNAME}:${port}`;
+    Endpoint.configure(server);
+
+    if (await Endpoint.server.alive())
+      return { server };
 
     const process = this.spawn({ port });
-    const ready = await this.await(client, timeout);
+    const ready = await this.await(timeout);
     if (!ready) {
       process.kill();
       throw new Error("Server failed to start within timeout");
     }
-    return { client, process };
+    return { server, process };
   }
 }

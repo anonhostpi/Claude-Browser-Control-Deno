@@ -1,33 +1,42 @@
 /**
  * Claude Browser Control for Deno
- * 
+ *
  * A library for controlling Chrome-based browsers via CDP
+ * @module
  */
 
-// Re-export all modules
-export * from "./os/mod.ts";
-export * from "./browsers/mod.ts";
-export * from "./profiles/mod.ts";
-export * from "./launcher/mod.ts";
-export * from "./cdp/mod.ts";
+// Client - Contract-driven browser control client
+export * from "./client/mod.ts";
 
-// Convenience exports for common use cases
-import { detectOS } from "./os/mod.ts";
-import { Browser } from "./browsers/mod.ts";
-import { CLI } from "./cli/cli.ts";
-import { getProfile, discoverProfiles, getClaudeProfile } from "./profiles/mod.ts";
-import { launchBrowser } from "./launcher/mod.ts";
-import { CDP } from "./cdp/mod.ts";
+// CLI - Command-line interface
+export * from "./cli/mod.ts";
 
+// MCP - Model Context Protocol server
+export { MCPServer, type MCPServerConfig } from "./mcp/server.ts";
+export type {
+  JSONRPCRequest,
+  JSONRPCResponse,
+  JSONRPCError,
+  JSONRPCNotification,
+  MCPTool,
+  ToolsListResult,
+  ToolsCallParams,
+  ToolResultContent,
+  ToolsCallResult,
+  InitializeParams,
+  InitializeResult,
+} from "./mcp/types.ts";
+export { ErrorCodes } from "./mcp/types.ts";
+
+// Orchestrator - Contract-driven REST framework
+export * from "./orchestrator/client/mod.ts";
+export * from "./orchestrator/server/mod.ts";
+export * from "./orchestrator/contract.ts";
+export * from "./orchestrator/loader.ts";
 export {
-  Browser,
-  // TODO: remove CLI from exports
-  CLI,
-  CDP,
-
-  detectOS,
-  getProfile,
-  discoverProfiles,
-  getClaudeProfile,
-  launchBrowser,
-};
+  transpile,
+  transpileSync,
+  getDefaultOutputPath,
+  type TranspileOptions,
+  type TranspileResult,
+} from "./orchestrator/transpile.ts";
