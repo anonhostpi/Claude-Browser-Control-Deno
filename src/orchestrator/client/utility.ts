@@ -1,6 +1,9 @@
 import { Client } from "./client.ts";
 import type { EndpointContract } from "../contract.ts";
-import type { JSONSchema, FromSchema } from "json-schema-to-ts";
+import type {
+  JSONSchema,
+  FromSchema
+} from "../schema.ts";
 
 /**
  * Extract a contract by its name from a contracts array type.

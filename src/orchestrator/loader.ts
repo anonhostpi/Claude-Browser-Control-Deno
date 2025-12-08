@@ -21,7 +21,7 @@ import { parse as parseYaml } from "@std/yaml";
 import { parse as parseToml } from "@std/toml";
 import { dirname, toFileUrl } from "@std/path";
 import type { EndpointContract, MCPToolConfig, Method } from "./contract.ts";
-import type { JSONSchema } from "json-schema-to-ts";
+import type { JSONSchema } from "./schema.ts";
 
 /**
  * Contract file structure with optional base override

@@ -1,4 +1,4 @@
-import { JSONSchema } from "json-schema-to-ts";
+import { JSONSchema } from "./schema.ts";
 export type Method = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "HEAD";
 
 /**

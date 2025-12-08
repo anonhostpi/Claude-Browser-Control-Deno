@@ -193,7 +193,7 @@ function generateTypeScript(contracts: LoadedContracts): string {
     " *   - Namespaced types: e.g., Target.InfoContract, Target.InfoResponse",
     " */",
     "",
-    "import type { FromSchema } from \"json-schema-to-ts\";",
+    "import type { FromSchema } from \"../schema.ts\";",
     "import type { ContractByName } from \"../client/utility.ts\";",
     "import type { Client } from \"../client/client.ts\";",
     "import { create as _create } from \"../client/utility.ts\";",

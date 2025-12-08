@@ -1,7 +1,7 @@
 import { Hono, Handler, Context } from "hono";
 import { upgradeWebSocket } from "hono/deno";
 import { EndpointContract, Method } from "../contract.ts";
-import { JSONSchema } from "json-schema-to-ts";
+import { JSONSchema } from "../schema.ts";
 import * as AJV from "ajv";
 import { InvalidResponseError, SubrouteNotFoundError } from "./errors.ts";
 

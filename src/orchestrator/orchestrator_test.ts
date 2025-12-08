@@ -14,7 +14,7 @@ import { Client } from "./client/client.ts";
 import { create as createClientUtility, type ContractByName } from "./client/utility.ts";
 import { build as buildRoutes } from "./server/builder.ts";
 import { EndpointContract } from "./contract.ts";
-import { JSONSchema, FromSchema } from "json-schema-to-ts";
+import { JSONSchema, FromSchema } from "./schema.ts"
 import { toFileUrl } from "@std/path";
 import { parse, detectFormat, load, loadSync, loadWithBase, getDefaultBase } from "./loader.ts";
 import { transpile, transpileSync, getDefaultOutputPath } from "./transpile.ts";
@@ -2091,7 +2091,6 @@ Deno.test("transpile: generated TypeScript passes type checking", async () => {
   const sourceFile = `${tempDir}/contracts.yaml`;
   const contractsFile = `${tempDir}/contracts.ts`;
   const testFile = `${tempDir}/type_test.ts`;
-  const denoJsonFile = `${tempDir}/deno.json`;
 
   // Create a contract with a specific response schema
   const yaml = `
@@ -2115,14 +2114,6 @@ contracts:
 `;
 
   await Deno.writeTextFile(sourceFile, yaml);
-
-  // Create a deno.json with the necessary import
-  const denoJson = {
-    imports: {
-      "json-schema-to-ts": "npm:json-schema-to-ts@^3.1.1",
-    },
-  };
-  await Deno.writeTextFile(denoJsonFile, JSON.stringify(denoJson, null, 2));
 
   // Create client directory with mock utility.ts for the generated import
   // The generated import is "../client/utility.ts" relative to contracts.ts,
@@ -2151,13 +2142,18 @@ export class Client {
 `;
   await Deno.writeTextFile(`${clientDir}/client.ts`, clientCode);
 
+  // Copy schema.ts to temp directory for FromSchema import
+  const schemaSource = new URL("./schema.ts", import.meta.url);
+  const schemaContent = await Deno.readTextFile(schemaSource);
+  await Deno.writeTextFile(`${tempDir}/schema.ts`, schemaContent);
+
   try {
     // Transpile to TypeScript
     await transpile(sourceFile, { output: contractsFile, format: "ts" });
 
     // Create a test file that uses the generated types with FromSchema
     const testCode = `
-import { FromSchema } from "json-schema-to-ts";
+import { FromSchema } from "./schema.ts";
 import { contracts } from "./contracts.ts";
 
 // Extract the response schema type from the first contract
