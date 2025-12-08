@@ -42,8 +42,10 @@ function _create<
         break;
     }
     return response as ResponseType | ErrorType;
-  }
+  };
 }
+
+export type Extension = ReturnType<typeof _create>;
 
 export function create<
   RequestSchema extends JSONSchema,
