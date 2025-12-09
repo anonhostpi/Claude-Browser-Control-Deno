@@ -1,8 +1,9 @@
 /**
  * MCP (Model Context Protocol) server module.
  *
- * This module provides an MCP server that bridges Claude to the
- * browser control REST API.
+ * This module provides a contract-driven MCP server that bridges Claude to the
+ * browser control REST API. Design follows CLI pattern with type-safe interfaces
+ * derived from API contracts.
  *
  * @example
  * ```ts
@@ -16,5 +17,8 @@
  * ```
  */
 
-export { MCPServer, type MCPServerConfig } from "./server.ts";
+export { MCPServer } from "./server.ts";
+export type { MCPServerConfig } from "./types.ts";
+
+// Re-export all types for consumers
 export * from "./types.ts";

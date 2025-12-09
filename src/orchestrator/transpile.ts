@@ -362,26 +362,28 @@ function generateTypeScript(contracts: LoadedContracts): string {
   lines.push("  ;");
   lines.push("");
 
-  // IMCP helper type for prefixing
+  // Helper type for prefixing MiniBinding keys (available for userland)
   lines.push("/**");
-  lines.push(" * Helper type to prefix MiniBinding keys with namespace.");
+  lines.push(" * Helper type to prefix MiniBinding keys with namespace and underscore.");
   lines.push(" * Maps \"health\" -> \"root_health\", \"info\" -> \"endpoint_info\", etc.");
+  lines.push(" * Exported for userland use cases requiring underscore-based naming.");
   lines.push(" */");
-  lines.push("type PrefixedMiniBinding<Prefix extends string, T> = {");
+  lines.push("export type PrefixedMiniBinding<Prefix extends string, T> = {");
   lines.push("  [K in keyof T as `${Prefix}_${K & string}`]: T[K];");
   lines.push("};");
   lines.push("");
 
-  // IContractMCP - combines all MiniBinding types with underscore naming (root_health)
+  // IContractMCP - combines all Binding types with colon naming (same as CLI)
   lines.push("/**");
-  lines.push(" * Combined MCP binding type - maps tool names (underscore format) to handlers.");
+  lines.push(" * Combined MCP binding type - maps tool names (colon format) to handlers.");
   lines.push(" * Used by MCP server to implement all tool handlers.");
+  lines.push(" * Uses same colon naming convention as IContractCLI.");
   lines.push(" */");
   lines.push("export type IContractMCP<Value = unknown> =");
   for (let i = 0; i < namespaceNames.length; i++) {
     const ns = namespaceNames[i];
     const prefix = i === 0 ? "  " : "  & ";
-    lines.push(`${prefix}PrefixedMiniBinding<"${ns.toLowerCase()}", ${ns}.MiniBinding<Value>>`);
+    lines.push(`${prefix}${ns}.Binding<Value>`);
   }
   lines.push("  ;");
   lines.push("");
