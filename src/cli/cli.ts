@@ -86,6 +86,7 @@ export class CLI implements ICLI {
   // ==========================================================================
 
   static readonly #registrars: CommandRegistrar[] = [];
+  static readonly #blacklist = new Set(["constructor", "main"]);
 
   /**
    * Register a command registrar function.
@@ -664,7 +665,7 @@ export class CLI implements ICLI {
     }
 
     // Blacklist private members and internal methods
-    if (cmd.startsWith("#") || cmd.startsWith("_")) {
+    if (cmd.startsWith("#") || cmd.startsWith("_") || CLI.#blacklist.has(cmd)) {
       throw new Error(`Unknown command: ${cmd}. Use --help for usage.`);
     }
 
