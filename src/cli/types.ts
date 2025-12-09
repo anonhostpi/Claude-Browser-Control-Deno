@@ -3,6 +3,9 @@
  *
  * Type-safe CLI types derived from contract definitions.
  * All types are auto-derived from API bindings where possible.
+ *
+ * Note: MCP commands are registered dynamically via CLI.register()
+ * and are not part of these static type definitions.
  */
 
 import * as API from "../orchestrator/contracts/api.ts";
@@ -123,20 +126,21 @@ export type ParsedArgs = {
  * Contract command type - async function returning JSON-serializable result
  * Used sparingly in interfaces only
  */
-export type ContractCommand = () => Promise<JSONSerializable>;
+export type CommandFunction = () => Promise<JSONSerializable>;
 
 /**
  * Contract CLI interface - maps full contract names to commands.
  * Auto-generated in api.ts from all contract namespaces.
  */
-export type IContractCLI = API.IContractCLI<ContractCommand>;
+export type IContractCLI = API.IContractCLI<CommandFunction>;
 
 // =============================================================================
 // Additional CLI Commands
 // =============================================================================
 
 /**
- * Additional (non-contract) CLI commands interface
+ * Additional (non-contract) CLI commands interface.
+ * Note: MCP commands are registered dynamically and not listed here.
  */
 export interface IAdditionalCLI {
   // Getters (synchronous, JSON-serializable)
@@ -148,7 +152,6 @@ export interface IAdditionalCLI {
   usage(command?: string): Promise<string>;
   contracts(): Promise<ContractInfo[]>;
   "serve:rest"(): Promise<void>;
-  "serve:mcp"(): Promise<void>;
 }
 
 /**
@@ -188,7 +191,8 @@ export type { ClientLevel };
 export type ContractCommandName = keyof IContractCLI;
 
 /**
- * All additional command names
+ * Additional command names (built-in only).
+ * Note: MCP commands are registered dynamically and resolved at runtime.
  */
 export type AdditionalCommandName =
   | "help"
@@ -196,8 +200,7 @@ export type AdditionalCommandName =
   | "version"
   | "location"
   | "contracts"
-  | "serve:rest"
-  | "serve:mcp";
+  | "serve:rest";
 
 /**
  * All command names

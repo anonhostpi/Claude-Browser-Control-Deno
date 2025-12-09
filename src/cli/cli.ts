@@ -11,7 +11,6 @@
 import { Server } from "../orchestrator/server/mod.ts";
 import { Controller } from "./spawn.ts";
 import { Root, Endpoint, Context, Target, Node } from "../client/mod.ts";
-import { MCPServer } from "../mcp/mod.ts";
 import { contracts } from "../orchestrator/contracts/api.ts";
 import * as API from "../orchestrator/contracts/api.ts";
 import {
@@ -19,6 +18,7 @@ import {
   type FlagMap,
   type ParsedArgs,
   type ContractInfo,
+  type CommandFunction,
   type LongFlag,
   SHORT_FLAGS,
 } from "./types.ts";
@@ -33,7 +33,68 @@ const LONG_FLAGS: Record<string, LongFlag> = Object.fromEntries(
   Object.entries(SHORT_FLAGS).map(([long, short]) => [short, long as LongFlag])
 );
 
+// =============================================================================
+// Command Registration Types
+// =============================================================================
+
+/** Re-export CommandFunction for external modules */
+export type { CommandFunction };
+
+/**
+ * CLI context interface for command registration.
+ * Provides access to CLI state needed by registered commands.
+ */
+export interface ICLIContext {
+  /** Get optional flag value */
+  optional(name: string): string | undefined;
+  /** Get required flag value or throw */
+  require(name: string): string;
+  /** Check if flag is present */
+  has(name: string): boolean;
+  /** Get parsed JSON body if any */
+  json(): JSONSerializable | undefined;
+}
+
+/**
+ * Flag metadata for help text generation
+ */
+export interface FlagInfo {
+  name: string;
+  short?: string;
+  description: string;
+  required?: boolean;
+}
+
+/**
+ * Command entry with handler and metadata
+ */
+export interface CommandEntry {
+  handler: CommandFunction;
+  description: string;
+  flags?: FlagInfo[];
+}
+
+/**
+ * Command registrar function type.
+ * Called with CLI context, returns map of command names to entries.
+ */
+export type CommandRegistrar = (context: ICLIContext) => Record<string, CommandEntry>;
+
 export class CLI implements ICLI {
+  // ==========================================================================
+  // Static Command Registration
+  // ==========================================================================
+
+  static readonly #registrars: CommandRegistrar[] = [];
+
+  /**
+   * Register a command registrar function.
+   * Called before CLI.create() to register commands from external modules.
+   */
+  static register(registrar: CommandRegistrar): void {
+    CLI.#registrars.push(registrar);
+  }
+
   // ==========================================================================
   // Static Parse Method (settable)
   // ==========================================================================
@@ -157,6 +218,7 @@ export class CLI implements ICLI {
   readonly #version: string;
   readonly #usage: string;
   readonly #controller: Controller;
+  readonly #registry: Record<string, CommandEntry>;
 
   #cached: ParsedArgs | null = null;
 
@@ -165,6 +227,21 @@ export class CLI implements ICLI {
     this.#version = version;
     this.#usage = usage;
     this.#controller = Controller.create(location);
+
+    // Build CLI context for command registration
+    const context: ICLIContext = {
+      optional: (name: string) => this.#optional(name as LongFlag),
+      require: (name: string) => this.#require(name as LongFlag),
+      has: (name: string) => this.#has(name as LongFlag),
+      json: () => this.#json,
+    };
+
+    // Initialize registry from all registrars
+    this.#registry = {};
+    for (const registrar of CLI.#registrars) {
+      const commands = registrar(context);
+      Object.assign(this.#registry, commands);
+    }
   }
 
   // ==========================================================================
@@ -476,6 +553,21 @@ export class CLI implements ICLI {
       return Promise.resolve(this.#usage);
     }
 
+    // Check registered commands first
+    const registered = this.#registry[command as string];
+    if (registered) {
+      let helpText = `${command} - ${registered.description}\n`;
+      if (registered.flags && registered.flags.length > 0) {
+        helpText += `\nFlags:\n`;
+        for (const flag of registered.flags) {
+          const short = flag.short ? `-${flag.short}, ` : "    ";
+          const req = flag.required ? " (required)" : "";
+          helpText += `  ${short}--${flag.name}${req}\n      ${flag.description}\n`;
+        }
+      }
+      return Promise.resolve(helpText);
+    }
+
     // Find contract by name
     const contract = contracts.find((c) => c.name === command);
     if (!contract) {
@@ -534,12 +626,6 @@ export class CLI implements ICLI {
     await Server.create({ port, pid, hostname: host }).start();
   }
 
-  async "serve:mcp"(): Promise<void> {
-    const apiUrl = this.#optional("server");
-    const server = new MCPServer({ apiUrl });
-    await server.run();
-  }
-
   // ==========================================================================
   // Main Entry Point
   // ==========================================================================
@@ -580,6 +666,12 @@ export class CLI implements ICLI {
     // Blacklist private members and internal methods
     if (cmd.startsWith("#") || cmd.startsWith("_")) {
       throw new Error(`Unknown command: ${cmd}. Use --help for usage.`);
+    }
+
+    // Check registry first (from external modules like MCP)
+    const registered = this.#registry[cmd];
+    if (registered) {
+      return await registered.handler();
     }
 
     // Look up the member on the CLI instance

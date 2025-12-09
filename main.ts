@@ -3,7 +3,11 @@
  */
 
 import { CLI } from "./src/cli/cli.ts";
+import { CommandRegistrar as MCP } from "./src/mcp/mod.ts";
 import { parse } from "@std/jsonc";
+
+// Register MCP commands before creating CLI
+CLI.register(MCP);
 
 if (!import.meta.main)
   throw new Error("main.ts should be run as a command.");
@@ -25,7 +29,9 @@ USAGE:
 
 BUILT-IN COMMANDS:
   serve:rest        Start the REST API server
-  serve:mcp         Start the MCP server
+  serve:mcp-stdio   Start MCP server over stdio (standard for CLI/IDE)
+  serve:mcp-http    Start MCP server over HTTP with SSE
+  serve:mcp-ws      Start MCP server over WebSocket
   contracts         List all available contract commands
   version           Show version number
   location          Show CLI executable path
@@ -81,8 +87,14 @@ EXAMPLES:
   # Start the server
   deno task start serve:rest
 
-  # Start MCP server (uses --server for API URL)
-  deno task start serve:mcp -s http://localhost:9333
+  # Start MCP server over stdio
+  deno task start serve:mcp-stdio -s http://localhost:9333
+
+  # Start MCP server over HTTP (port 8080)
+  deno task start serve:mcp-http -p 8080
+
+  # Start MCP server over WebSocket
+  deno task start serve:mcp-ws -p 8080
 
   # List available browsers
   deno task start root:list
