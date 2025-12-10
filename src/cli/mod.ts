@@ -16,7 +16,7 @@ export type {
   ShortToLong,
   FlagMap,
   ParsedArgs,
-  ContractCommand,
+  CommandFunction,
   IContractCLI,
   IAdditionalCLI,
   ContractInfo,
