@@ -19,6 +19,7 @@
 
 export { MCPServer } from "./server.ts";
 export type { MCPServerConfig } from "./types.ts";
+export const DEFAULT_MCP_PORT = 8080;
 
 // Re-export all types for consumers
 export * from "./types.ts";

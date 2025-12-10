@@ -28,3 +28,16 @@ export interface Instance {
 
 export const DEFAULT_SERVER_PORT = 9333;
 export const DEFAULT_SERVER_HOSTNAME = "127.0.0.1";
+export const DEFAULT_SERVER_URL = `http://${DEFAULT_SERVER_HOSTNAME}:${DEFAULT_SERVER_PORT}`;
+
+export function ensure_url(url: string = DEFAULT_SERVER_URL): [string, URL] {
+  try {
+    try {
+      return [url, new URL(url)];
+    } catch {
+      return [`http://${url}`, new URL(`http://${url}`)];
+    }
+  } catch {
+    throw new Error(`Invalid URL: ${url}`);
+  }
+}

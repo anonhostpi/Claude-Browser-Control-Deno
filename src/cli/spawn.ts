@@ -4,9 +4,7 @@
  */
 
 import { Root } from "../client/mod.ts";
-
-const DEFAULT_SERVER_PORT = 9333;
-const DEFAULT_SERVER_HOSTNAME = "127.0.0.1";
+import { DEFAULT_SERVER_HOSTNAME, DEFAULT_SERVER_PORT } from "../orchestrator/server/types.ts";
 
 export interface SpawnOptions {
   port?: number;

@@ -4,6 +4,8 @@
 
 import { CLI } from "./src/cli/cli.ts";
 import { CommandRegistrar as MCP } from "./src/mcp/mod.ts";
+import { DEFAULT_SERVER_URL, DEFAULT_SERVER_HOSTNAME, DEFAULT_SERVER_PORT } from "./src/orchestrator/server/types.ts";
+import { DEFAULT_MCP_PORT } from "./src/mcp/mod.ts";
 import { parse } from "@std/jsonc";
 
 // Register MCP commands before creating CLI
@@ -69,15 +71,15 @@ CONTRACT COMMANDS (use contract name directly):
 
 FLAGS:
   -h, --help        Show help
-  -s, --server      API server URL (default: http://localhost:9333)
+  -s, --server      API server URL (default: ${DEFAULT_SERVER_URL})
   -e, --endpoint    Browser type (chrome, edge, brave) or host address
   -c, --context     Profile name or port number
   -t, --target      Target ID (tab/page)
   -n, --node        Node ID (DOM element)
 
 SERVE FLAGS:
-  -i, --host        Host to bind (default: localhost)
-  -p, --port        Port to bind (default: 9333)
+  -i, --host        Host to bind (default: ${DEFAULT_SERVER_HOSTNAME})
+  -p, --port        Port to bind (default: ${DEFAULT_SERVER_PORT})
 
 REQUEST BODY:
   Pass request options as a JSON string argument after flags.
@@ -88,13 +90,13 @@ EXAMPLES:
   deno task start serve:rest
 
   # Start MCP server over stdio
-  deno task start serve:mcp-stdio -s http://localhost:9333
+  deno task start serve:mcp-stdio -s http://${DEFAULT_SERVER_HOSTNAME}:${DEFAULT_SERVER_PORT}
 
-  # Start MCP server over HTTP (port 8080)
-  deno task start serve:mcp-http -p 8080
+  # Start MCP server over HTTP (port ${DEFAULT_MCP_PORT})
+  deno task start serve:mcp-http -p ${DEFAULT_MCP_PORT}
 
   # Start MCP server over WebSocket
-  deno task start serve:mcp-ws -p 8080
+  deno task start serve:mcp-ws -p ${DEFAULT_MCP_PORT}
 
   # List available browsers
   deno task start root:list

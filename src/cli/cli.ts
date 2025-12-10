@@ -11,6 +11,7 @@
 import { Server } from "../orchestrator/server/mod.ts";
 import { Controller } from "./spawn.ts";
 import { Root, Endpoint, Context, Target, Node } from "../client/mod.ts";
+import { DEFAULT_SERVER_URL, DEFAULT_SERVER_HOSTNAME, DEFAULT_SERVER_PORT } from "../orchestrator/server/types.ts";
 import { contracts } from "../orchestrator/contracts/api.ts";
 import * as API from "../orchestrator/contracts/api.ts";
 import {
@@ -314,7 +315,7 @@ export class CLI implements ICLI {
 
   async #getRoot(): Promise<Root> {
     await this.#ensure();
-    const serverUrl = this.#optional("server") ?? "http://localhost:9333";
+    const serverUrl = this.#optional("server") ?? DEFAULT_SERVER_URL;
     return new Root(serverUrl);
   }
 
@@ -619,9 +620,9 @@ export class CLI implements ICLI {
   async "serve:rest"(): Promise<void> {
     const _port = this.#optional("port");
     const _pid = this.#optional("parent-pid" as LongFlag);
-    
-    const host = this.#optional("host") ?? "localhost";
-    const port = _port ? parseInt(_port) : 9333;
+
+    const host = this.#optional("host") ?? DEFAULT_SERVER_HOSTNAME;
+    const port = _port ? parseInt(_port) : DEFAULT_SERVER_PORT;
     const pid = _pid ? parseInt(_pid) : undefined;
 
     await Server.create({ port, pid, hostname: host }).start();
