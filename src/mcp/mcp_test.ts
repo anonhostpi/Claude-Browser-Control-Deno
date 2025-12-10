@@ -9,12 +9,77 @@ import { assertEquals, assertExists, assertStringIncludes } from "@std/assert";
 import { Server as MCPServer } from "./server.ts";
 import type {
   JSONRPCRequest,
+  JSONRPCResponse,
+  JSONRPCNotification,
+  JSONRPCMessage,
   MCPTool,
   ToolsListResult,
   ToolsCallResult,
   InitializeResult,
 } from "./types.ts";
 import { ErrorCodes } from "./types.ts";
+import type { IMCPTransport } from "./transports/types.ts";
+
+// =============================================================================
+// Test Helper: MockTransport
+// =============================================================================
+
+/**
+ * Mock transport for testing MCP server without actual I/O.
+ * Captures messages sent by the server and allows sending messages to it.
+ */
+class MockTransport implements IMCPTransport {
+  onmessage?: (message: JSONRPCMessage, sessionId?: string) => void;
+  onerror?: (error: Error) => void;
+  onclose?: () => void;
+
+  #pendingResolve?: (message: JSONRPCResponse) => void;
+
+  start(): Promise<void> {
+    return Promise.resolve();
+  }
+
+  send(message: JSONRPCMessage): Promise<void> {
+    if (this.#pendingResolve) {
+      this.#pendingResolve(message as JSONRPCResponse);
+      this.#pendingResolve = undefined;
+    }
+    return Promise.resolve();
+  }
+
+  close(): Promise<void> {
+    this.onclose?.();
+    return Promise.resolve();
+  }
+
+  /** Send a request and get the response */
+  request(request: JSONRPCRequest): Promise<JSONRPCResponse> {
+    return new Promise((resolve) => {
+      this.#pendingResolve = resolve;
+      this.onmessage?.(request);
+    });
+  }
+
+  /** Send a notification (no response expected) */
+  notify(notification: JSONRPCNotification): void {
+    this.onmessage?.(notification);
+  }
+}
+
+/** Helper to create a connected server with mock transport */
+async function createTestServer(config?: ConstructorParameters<typeof MCPServer>[0]): Promise<{
+  server: MCPServer;
+  transport: MockTransport;
+}> {
+  const server = new MCPServer(config);
+  const transport = new MockTransport();
+
+  // Connect but don't await (it would block on start())
+  server.connect(transport);
+  await transport.start();
+
+  return { server, transport };
+}
 
 // =============================================================================
 // Server Initialization Tests
@@ -47,7 +112,7 @@ Deno.test("MCPServer: initializes with partial config", () => {
 // =============================================================================
 
 Deno.test("MCPServer: handles initialize request", async () => {
-  const server = new MCPServer();
+  const { transport } = await createTestServer();
 
   const request: JSONRPCRequest = {
     jsonrpc: "2.0",
@@ -60,7 +125,7 @@ Deno.test("MCPServer: handles initialize request", async () => {
     },
   };
 
-  const response = await server.handleRequest(request);
+  const response = await transport.request(request);
 
   assertEquals(response.jsonrpc, "2.0");
   assertEquals(response.id, 1);
@@ -73,7 +138,7 @@ Deno.test("MCPServer: handles initialize request", async () => {
 });
 
 Deno.test("MCPServer: initialize returns correct server info", async () => {
-  const server = new MCPServer({
+  const { transport } = await createTestServer({
     name: "custom-server",
     version: "3.0.0",
   });
@@ -89,7 +154,7 @@ Deno.test("MCPServer: initialize returns correct server info", async () => {
     },
   };
 
-  const response = await server.handleRequest(request);
+  const response = await transport.request(request);
   const result = response.result as InitializeResult;
 
   assertEquals(result.serverInfo.name, "custom-server");
@@ -97,7 +162,7 @@ Deno.test("MCPServer: initialize returns correct server info", async () => {
 });
 
 Deno.test("MCPServer: initialize returns tools capability", async () => {
-  const server = new MCPServer();
+  const { transport } = await createTestServer();
 
   const request: JSONRPCRequest = {
     jsonrpc: "2.0",
@@ -110,7 +175,7 @@ Deno.test("MCPServer: initialize returns tools capability", async () => {
     },
   };
 
-  const response = await server.handleRequest(request);
+  const response = await transport.request(request);
   const result = response.result as InitializeResult;
 
   assertExists(result.capabilities.tools);
@@ -121,7 +186,7 @@ Deno.test("MCPServer: initialize returns tools capability", async () => {
 // =============================================================================
 
 Deno.test("MCPServer: handles tools/list request", async () => {
-  const server = new MCPServer();
+  const { transport } = await createTestServer();
 
   const request: JSONRPCRequest = {
     jsonrpc: "2.0",
@@ -129,7 +194,7 @@ Deno.test("MCPServer: handles tools/list request", async () => {
     method: "tools/list",
   };
 
-  const response = await server.handleRequest(request);
+  const response = await transport.request(request);
 
   assertEquals(response.jsonrpc, "2.0");
   assertEquals(response.id, 2);
@@ -143,7 +208,7 @@ Deno.test("MCPServer: handles tools/list request", async () => {
 });
 
 Deno.test("MCPServer: tools have correct structure", async () => {
-  const server = new MCPServer();
+  const { transport } = await createTestServer();
 
   const request: JSONRPCRequest = {
     jsonrpc: "2.0",
@@ -151,7 +216,7 @@ Deno.test("MCPServer: tools have correct structure", async () => {
     method: "tools/list",
   };
 
-  const response = await server.handleRequest(request);
+  const response = await transport.request(request);
   const result = response.result as ToolsListResult;
 
   // Each tool should have name, description, and inputSchema
@@ -164,7 +229,7 @@ Deno.test("MCPServer: tools have correct structure", async () => {
 });
 
 Deno.test("MCPServer: tools include expected contract tools", async () => {
-  const server = new MCPServer();
+  const { transport } = await createTestServer();
 
   const request: JSONRPCRequest = {
     jsonrpc: "2.0",
@@ -172,7 +237,7 @@ Deno.test("MCPServer: tools include expected contract tools", async () => {
     method: "tools/list",
   };
 
-  const response = await server.handleRequest(request);
+  const response = await transport.request(request);
   const result = response.result as ToolsListResult;
   const toolNames = result.tools.map((t: MCPTool) => t.name);
 
@@ -186,7 +251,7 @@ Deno.test("MCPServer: tools include expected contract tools", async () => {
 // =============================================================================
 
 Deno.test("MCPServer: returns error for missing tool name in tools/call", async () => {
-  const server = new MCPServer();
+  const { transport } = await createTestServer();
 
   const request: JSONRPCRequest = {
     jsonrpc: "2.0",
@@ -197,7 +262,7 @@ Deno.test("MCPServer: returns error for missing tool name in tools/call", async 
     },
   };
 
-  const response = await server.handleRequest(request);
+  const response = await transport.request(request);
 
   assertEquals(response.jsonrpc, "2.0");
   assertEquals(response.id, 4);
@@ -206,7 +271,7 @@ Deno.test("MCPServer: returns error for missing tool name in tools/call", async 
 });
 
 Deno.test("MCPServer: returns error for unknown tool in tools/call", async () => {
-  const server = new MCPServer();
+  const { transport } = await createTestServer();
 
   const request: JSONRPCRequest = {
     jsonrpc: "2.0",
@@ -217,7 +282,7 @@ Deno.test("MCPServer: returns error for unknown tool in tools/call", async () =>
     },
   };
 
-  const response = await server.handleRequest(request);
+  const response = await transport.request(request);
 
   assertEquals(response.jsonrpc, "2.0");
   assertEquals(response.id, 4);
@@ -232,7 +297,7 @@ Deno.test("MCPServer: returns error for unknown tool in tools/call", async () =>
 // =============================================================================
 
 Deno.test("MCPServer: returns error for unknown method", async () => {
-  const server = new MCPServer();
+  const { transport } = await createTestServer();
 
   const request: JSONRPCRequest = {
     jsonrpc: "2.0",
@@ -240,7 +305,7 @@ Deno.test("MCPServer: returns error for unknown method", async () => {
     method: "unknown/method",
   };
 
-  const response = await server.handleRequest(request);
+  const response = await transport.request(request);
 
   assertEquals(response.jsonrpc, "2.0");
   assertEquals(response.id, 3);
@@ -249,7 +314,7 @@ Deno.test("MCPServer: returns error for unknown method", async () => {
 });
 
 Deno.test("MCPServer: returns error for resources/list (not implemented)", async () => {
-  const server = new MCPServer();
+  const { transport } = await createTestServer();
 
   const request: JSONRPCRequest = {
     jsonrpc: "2.0",
@@ -257,7 +322,7 @@ Deno.test("MCPServer: returns error for resources/list (not implemented)", async
     method: "resources/list",
   };
 
-  const response = await server.handleRequest(request);
+  const response = await transport.request(request);
 
   assertEquals(response.jsonrpc, "2.0");
   assertExists(response.error);
@@ -265,7 +330,7 @@ Deno.test("MCPServer: returns error for resources/list (not implemented)", async
 });
 
 Deno.test("MCPServer: returns error for prompts/list (not implemented)", async () => {
-  const server = new MCPServer();
+  const { transport } = await createTestServer();
 
   const request: JSONRPCRequest = {
     jsonrpc: "2.0",
@@ -273,7 +338,7 @@ Deno.test("MCPServer: returns error for prompts/list (not implemented)", async (
     method: "prompts/list",
   };
 
-  const response = await server.handleRequest(request);
+  const response = await transport.request(request);
 
   assertEquals(response.jsonrpc, "2.0");
   assertExists(response.error);
@@ -284,37 +349,37 @@ Deno.test("MCPServer: returns error for prompts/list (not implemented)", async (
 // Notification Tests
 // =============================================================================
 
-Deno.test("MCPServer: handles initialized notification", () => {
-  const server = new MCPServer();
+Deno.test("MCPServer: handles initialized notification", async () => {
+  const { transport } = await createTestServer();
 
   // This should not throw
-  server.handleNotification({
+  transport.notify({
     jsonrpc: "2.0",
     method: "notifications/initialized",
   });
 });
 
-Deno.test("MCPServer: handles cancelled notification", () => {
-  const server = new MCPServer();
+Deno.test("MCPServer: handles cancelled notification", async () => {
+  const { transport } = await createTestServer();
 
   // This should not throw
-  server.handleNotification({
+  transport.notify({
     jsonrpc: "2.0",
     method: "notifications/cancelled",
     params: { requestId: 123 },
   });
 });
 
-Deno.test("MCPServer: ignores unknown notifications without error", () => {
-  const server = new MCPServer();
+Deno.test("MCPServer: ignores unknown notifications without error", async () => {
+  const { transport } = await createTestServer();
 
   // This should not throw
-  server.handleNotification({
+  transport.notify({
     jsonrpc: "2.0",
     method: "unknown/notification",
   });
 
-  server.handleNotification({
+  transport.notify({
     jsonrpc: "2.0",
     method: "custom/event",
     params: { data: "test" },
@@ -326,7 +391,7 @@ Deno.test("MCPServer: ignores unknown notifications without error", () => {
 // =============================================================================
 
 Deno.test("MCPServer: success response has correct structure", async () => {
-  const server = new MCPServer();
+  const { transport } = await createTestServer();
 
   const request: JSONRPCRequest = {
     jsonrpc: "2.0",
@@ -334,7 +399,7 @@ Deno.test("MCPServer: success response has correct structure", async () => {
     method: "tools/list",
   };
 
-  const response = await server.handleRequest(request);
+  const response = await transport.request(request);
 
   assertEquals(response.jsonrpc, "2.0");
   assertEquals(response.id, 100);
@@ -343,7 +408,7 @@ Deno.test("MCPServer: success response has correct structure", async () => {
 });
 
 Deno.test("MCPServer: error response has correct structure", async () => {
-  const server = new MCPServer();
+  const { transport } = await createTestServer();
 
   const request: JSONRPCRequest = {
     jsonrpc: "2.0",
@@ -351,7 +416,7 @@ Deno.test("MCPServer: error response has correct structure", async () => {
     method: "invalid/method",
   };
 
-  const response = await server.handleRequest(request);
+  const response = await transport.request(request);
 
   assertEquals(response.jsonrpc, "2.0");
   assertEquals(response.id, 101);
@@ -362,7 +427,7 @@ Deno.test("MCPServer: error response has correct structure", async () => {
 });
 
 Deno.test("MCPServer: preserves request id in response", async () => {
-  const server = new MCPServer();
+  const { transport } = await createTestServer();
 
   // Test with numeric id
   const numericRequest: JSONRPCRequest = {
@@ -370,7 +435,7 @@ Deno.test("MCPServer: preserves request id in response", async () => {
     id: 42,
     method: "tools/list",
   };
-  const numericResponse = await server.handleRequest(numericRequest);
+  const numericResponse = await transport.request(numericRequest);
   assertEquals(numericResponse.id, 42);
 
   // Test with string id
@@ -379,7 +444,7 @@ Deno.test("MCPServer: preserves request id in response", async () => {
     id: "request-abc-123",
     method: "tools/list",
   };
-  const stringResponse = await server.handleRequest(stringRequest);
+  const stringResponse = await transport.request(stringRequest);
   assertEquals(stringResponse.id, "request-abc-123");
 });
 
@@ -438,8 +503,8 @@ Deno.test("types: ToolsCallResult can have error flag", () => {
 Deno.test("TDD: MCPServer should support client hierarchy", async () => {
   // Future: MCP should use the same client hierarchy as CLI
   // Root -> Endpoint -> Context -> Target -> Node
-  const server = new MCPServer({
-    apiUrl: "http://localhost:9333",
+  const { transport } = await createTestServer({
+    api: "http://localhost:9333",
   });
 
   const request: JSONRPCRequest = {
@@ -448,7 +513,7 @@ Deno.test("TDD: MCPServer should support client hierarchy", async () => {
     method: "tools/list",
   };
 
-  const response = await server.handleRequest(request);
+  const response = await transport.request(request);
   const result = response.result as ToolsListResult;
 
   // Tools should map to contract hierarchy
@@ -458,7 +523,7 @@ Deno.test("TDD: MCPServer should support client hierarchy", async () => {
 });
 
 Deno.test("TDD: MCPServer tools should have path parameters in schema", async () => {
-  const server = new MCPServer();
+  const { transport } = await createTestServer();
 
   const request: JSONRPCRequest = {
     jsonrpc: "2.0",
@@ -466,7 +531,7 @@ Deno.test("TDD: MCPServer tools should have path parameters in schema", async ()
     method: "tools/list",
   };
 
-  const response = await server.handleRequest(request);
+  const response = await transport.request(request);
   const result = response.result as ToolsListResult;
 
   // Find a tool that requires path parameters (e.g., endpoint:info needs :endpoint)
@@ -481,7 +546,7 @@ Deno.test("TDD: MCPServer tools should have path parameters in schema", async ()
 });
 
 Deno.test("TDD: MCPServer should handle tool call with path params", async () => {
-  const server = new MCPServer();
+  const { transport } = await createTestServer();
 
   // Get tools list first to find exact tool name
   const listRequest: JSONRPCRequest = {
@@ -489,7 +554,7 @@ Deno.test("TDD: MCPServer should handle tool call with path params", async () =>
     id: 1,
     method: "tools/list",
   };
-  const listResponse = await server.handleRequest(listRequest);
+  const listResponse = await transport.request(listRequest);
   const result = listResponse.result as ToolsListResult;
 
   // Find the root_list or root:list tool
@@ -509,7 +574,7 @@ Deno.test("TDD: MCPServer should handle tool call with path params", async () =>
       },
     };
 
-    const callResponse = await server.handleRequest(callRequest);
+    const callResponse = await transport.request(callRequest);
     // Response should be valid JSON-RPC (either success or error result)
     assertEquals(callResponse.jsonrpc, "2.0");
     assertEquals(callResponse.id, 2);
