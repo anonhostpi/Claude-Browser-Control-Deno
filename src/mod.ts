@@ -23,7 +23,6 @@ export type {
   ToolsCallParams,
   ToolResultContent,
   ToolsCallResult,
-  InitializeParams,
   InitializeResult,
 } from "./mcp/types.ts";
 export { ErrorCodes } from "./mcp/types.ts";
