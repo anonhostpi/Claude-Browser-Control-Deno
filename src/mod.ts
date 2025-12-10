@@ -12,8 +12,9 @@ export * from "./client/mod.ts";
 export * from "./cli/mod.ts";
 
 // MCP - Model Context Protocol server
-export { MCPServer, type MCPServerConfig } from "./mcp/server.ts";
+export { Server as MCPServer } from "./mcp/server.ts";
 export type {
+  MCPServerConfig,
   JSONRPCRequest,
   JSONRPCResponse,
   JSONRPCError,

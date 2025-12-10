@@ -1,7 +1,12 @@
 /**
  * MCP Server implementation.
  *
- * Contract-driven MCP server that bridges JSON-RPC 2.0 over stdio to REST API calls.
+ * Contract-driven MCP server that bridges JSON-RPC 2.0 to REST API calls.
+ * Supports multiple transport layers:
+ * - Stdio: Newline-delimited JSON-RPC over stdin/stdout
+ * - HTTP: Streamable HTTP with optional SSE
+ * - WebSocket: Bidirectional WebSocket communication
+ *
  * Design follows CLI pattern:
  * - Tool handlers are class members named by tool (e.g., "root:health", "endpoint:info")
  * - Dispatch uses blacklist-based dynamic member lookup
@@ -10,99 +15,128 @@
  */
 
 import { Root, Endpoint, Context, Target, Node } from "../client/mod.ts";
-import { contracts } from "../orchestrator/contracts/api.ts";
 import * as API from "../orchestrator/contracts/api.ts";
 import type { JSONObject, JSONSerializable } from "../orchestrator/schema.ts";
 import {
   type JSONRPCRequest,
   type JSONRPCResponse,
   type JSONRPCNotification,
+  type JSONRPCMessage,
   type InitializeResult,
   type ToolsListResult,
   type ToolsCallParams,
   type ToolsCallResult,
   type MCPTool,
-  type IMCPServer,
   type IContractMCP,
   type MCPServerConfig,
   ErrorCodes,
 } from "./types.ts";
+import { DEFAULT_SERVER_URL } from "../orchestrator/server/types.ts";
+import type { IMCPTransport, IMultiSessionTransport, HttpTransportConfig, WebSocketTransportConfig } from "./transports/types.ts";
+import { tools } from "./tools.ts";
 
 /**
- * Generate MCP tool schemas from contracts at runtime.
- */
-function generateTools(): MCPTool[] {
-  const tools: MCPTool[] = [];
-
-  for (const contract of contracts) {
-    // Check for mcp config using 'in' operator since not all contracts have it
-    const mcp = "mcp" in contract ? contract.mcp as { enabled?: boolean; tool?: string; description?: string } : undefined;
-    if (mcp?.enabled === false) continue;
-
-    const toolName = mcp?.tool ?? contract.name;
-    const description = mcp?.description ?? contract.description;
-
-    const inputSchema: MCPTool["inputSchema"] = { type: "object" as const };
-
-    // Extract path parameters
-    const pathParams = contract.path.match(/:(\w+)/g)?.map((p) => p.slice(1)) ?? [];
-    const properties: JSONObject = {};
-
-    for (const param of pathParams) {
-      properties[param] = { type: "string", description: `Path parameter: ${param}` };
-    }
-
-    // Add request body properties if contract has request schema
-    if ("request" in contract && contract.request && typeof contract.request === "object") {
-      const req = contract.request as { properties?: JSONObject; required?: string[] };
-      if (req.properties) {
-        Object.assign(properties, req.properties);
-      }
-    }
-
-    if (Object.keys(properties).length > 0) {
-      inputSchema.properties = properties;
-    }
-
-    // Required fields = path params + schema required
-    const required: string[] = [...pathParams];
-    if ("request" in contract && contract.request && typeof contract.request === "object") {
-      const req = contract.request as { required?: string[] };
-      if (Array.isArray(req.required)) {
-        required.push(...req.required.filter((r): r is string => typeof r === "string"));
-      }
-    }
-    if (required.length > 0) {
-      inputSchema.required = required;
-    }
-
-    tools.push({ name: toolName, description, inputSchema });
-  }
-
-  return tools;
-}
-
-/**
- * MCP Server that bridges JSON-RPC over stdio to REST API calls.
+ * MCP Server that bridges JSON-RPC to REST API calls.
  *
+ * Supports multiple transport layers via the connect() method.
  * Tool handlers are class members named with colon convention ("root:health").
  * Dispatch uses dynamic member lookup, same pattern as CLI.
+ *
+ * @example
+ * ```ts
+ * import { Server as MCPServer } from "./mcp/server.ts";
+ * const server = new MCPServer({ api: "http://localhost:9333" });
+ * await server.stdio();
+ * ```
  */
-export class MCPServer implements IMCPServer, IContractMCP {
+export class Server implements IContractMCP {
   readonly #root: Root;
   readonly #tools: MCPTool[];
   readonly #config: Required<MCPServerConfig>;
   #initialized = false;
+  #transport: IMCPTransport | null = null;
+  #currentSessionId?: string;
 
   constructor(config: MCPServerConfig = {}) {
     this.#config = {
-      apiUrl: config.apiUrl ?? "http://localhost:9333",
-      name: config.name ?? "browser-control-mcp",
+      api: config.api ?? DEFAULT_SERVER_URL,
+      name: config.name ?? "cdp-mcp",
       version: config.version ?? "1.0.0",
     };
 
-    this.#root = new Root(this.#config.apiUrl);
-    this.#tools = generateTools();
+    this.#root = new Root(this.#config.api);
+    this.#tools = tools();
+  }
+
+  // ==========================================================================
+  // Transport Management
+  // ==========================================================================
+
+  /**
+   * Connect to a transport and start handling messages.
+   * This is the primary way to run the MCP server with any transport.
+   */
+  async connect(transport: IMCPTransport): Promise<void> {
+    this.#transport = transport;
+
+    // Check if transport supports multiple sessions
+    const isMultiSession = "sendTo" in transport;
+
+    transport.onmessage = async (message: JSONRPCMessage, sessionId?: string) => {
+      this.#currentSessionId = sessionId;
+
+      if ("id" in message && message.id !== undefined) {
+        // Request - requires response
+        const response = await this.#request(message as JSONRPCRequest);
+
+        // Route response back through transport
+        if (isMultiSession && sessionId) {
+          await (transport as IMultiSessionTransport).sendTo(sessionId, response);
+        } else {
+          await transport.send(response);
+        }
+      } else {
+        // Notification - no response
+        this.#notification(message as JSONRPCNotification);
+      }
+    };
+
+    transport.onerror = (error: Error) => {
+      console.error("MCP transport error:", error);
+    };
+
+    transport.onclose = () => {
+      this.#transport = null;
+    };
+
+    await transport.start();
+  }
+
+  /**
+   * Run with stdio transport.
+   * Convenience method for CLI usage.
+   */
+  async stdio(): Promise<void> {
+    const { StdioTransport } = await import("./transports/stdio.ts");
+    await this.connect(new StdioTransport());
+  }
+
+  /**
+   * Run with HTTP transport.
+   * Convenience method for HTTP server usage.
+   */
+  async http(config: HttpTransportConfig = {}): Promise<void> {
+    const { HttpTransport } = await import("./transports/http.ts");
+    await this.connect(new HttpTransport(config));
+  }
+
+  /**
+   * Run with WebSocket transport.
+   * Convenience method for WebSocket server usage.
+   */
+  async ws(config: WebSocketTransportConfig = {}): Promise<void> {
+    const { WebSocketTransport } = await import("./transports/websocket.ts");
+    await this.connect(new WebSocketTransport(config));
   }
 
   // ==========================================================================
@@ -121,7 +155,7 @@ export class MCPServer implements IMCPServer, IContractMCP {
       },
     };
 
-    return Promise.resolve(this.#successResponse(request.id, result));
+    return Promise.resolve(this.#success(request.id, result));
   }
 
   "tools/list"(request: JSONRPCRequest): Promise<JSONRPCResponse> {
@@ -129,40 +163,36 @@ export class MCPServer implements IMCPServer, IContractMCP {
       tools: this.#tools,
     };
 
-    return Promise.resolve(this.#successResponse(request.id, result));
+    return Promise.resolve(this.#success(request.id, result));
   }
 
   async "tools/call"(request: JSONRPCRequest): Promise<JSONRPCResponse> {
     const params = request.params as unknown as ToolsCallParams;
 
     if (!params?.name) {
-      return this.#errorResponse(request.id, ErrorCodes.InvalidParams, "Missing tool name");
+      return this.#error(request.id, ErrorCodes.InvalidParams, "Missing tool name");
     }
 
-    // Dynamic dispatch to tool handler (same pattern as CLI)
-    const toolName = params.name;
-    const handler = this[toolName as keyof this];
-
-    if (handler === undefined || typeof handler !== "function") {
-      return this.#errorResponse(request.id, ErrorCodes.InvalidParams, `Unknown tool: ${toolName}`);
+    const handler = this.#dispatch(params.name);
+    if (!handler) {
+      return this.#error(request.id, ErrorCodes.InvalidParams, `Unknown tool: ${params.name}`);
     }
 
     try {
-      const result = await (handler as (args: JSONObject) => Promise<unknown>)
-        .call(this, params.arguments ?? {});
+      const result = await handler.call(this, params.arguments ?? {});
 
       const toolResult: ToolsCallResult = {
         content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
       };
 
-      return this.#successResponse(request.id, toolResult);
+      return this.#success(request.id, toolResult);
     } catch (error) {
       const toolResult: ToolsCallResult = {
         content: [{ type: "text", text: error instanceof Error ? error.message : String(error) }],
         isError: true,
       };
 
-      return this.#successResponse(request.id, toolResult);
+      return this.#success(request.id, toolResult);
     }
   }
 
@@ -333,28 +363,19 @@ export class MCPServer implements IMCPServer, IContractMCP {
   }
 
   // ==========================================================================
-  // Main Entry Points (IMCPServer interface)
+  // Internal Message Handlers
   // ==========================================================================
 
-  async handleRequest(request: JSONRPCRequest): Promise<JSONRPCResponse> {
+  async #request(request: JSONRPCRequest): Promise<JSONRPCResponse> {
     try {
-      const method = request.method;
-
-      // Blacklist private/internal methods
-      if (method.startsWith("#") || method.startsWith("_")) {
-        return this.#errorResponse(request.id, ErrorCodes.MethodNotFound, `Method not found: ${method}`);
+      const handler = this.#dispatch(request.method);
+      if (!handler) {
+        return this.#error(request.id, ErrorCodes.MethodNotFound, `Method not found: ${request.method}`);
       }
 
-      // Look up the method on this instance
-      const handler = this[method as keyof this];
-      if (handler === undefined || typeof handler !== "function") {
-        return this.#errorResponse(request.id, ErrorCodes.MethodNotFound, `Method not found: ${method}`);
-      }
-
-      // Call the handler
-      return await (handler as (req: JSONRPCRequest) => Promise<JSONRPCResponse>).call(this, request);
+      return await handler.call(this, request) as JSONRPCResponse;
     } catch (error) {
-      return this.#errorResponse(
+      return this.#error(
         request.id,
         ErrorCodes.InternalError,
         error instanceof Error ? error.message : String(error)
@@ -362,7 +383,7 @@ export class MCPServer implements IMCPServer, IContractMCP {
     }
   }
 
-  handleNotification(notification: JSONRPCNotification): void {
+  #notification(notification: JSONRPCNotification): void {
     switch (notification.method) {
       case "notifications/initialized":
         this.#initialized = true;
@@ -374,56 +395,40 @@ export class MCPServer implements IMCPServer, IContractMCP {
     }
   }
 
-  async run(): Promise<void> {
-    const decoder = new TextDecoder();
-    const encoder = new TextEncoder();
-    const reader = Deno.stdin.readable.getReader();
-    let buffer = "";
+  // ==========================================================================
+  // Dispatch Helper
+  // ==========================================================================
 
-    try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
+  /** Blacklisted method names that should not be dispatchable */
+  static readonly #blacklist = new Set(["connect", "stdio", "http", "ws", "constructor"]);
 
-        buffer += decoder.decode(value);
-        const lines = buffer.split("\n");
-        buffer = lines.pop() ?? "";
-
-        for (const line of lines) {
-          if (!line.trim()) continue;
-
-          try {
-            const message = JSON.parse(line);
-            if ("id" in message) {
-              const response = await this.handleRequest(message as JSONRPCRequest);
-              await Deno.stdout.write(encoder.encode(JSON.stringify(response) + "\n"));
-            } else {
-              this.handleNotification(message as JSONRPCNotification);
-            }
-          } catch {
-            const response: JSONRPCResponse = {
-              jsonrpc: "2.0",
-              id: 0,
-              error: { code: ErrorCodes.ParseError, message: "Parse error" },
-            };
-            await Deno.stdout.write(encoder.encode(JSON.stringify(response) + "\n"));
-          }
-        }
-      }
-    } finally {
-      reader.releaseLock();
+  /**
+   * Look up and validate a method/tool handler by name.
+   * Returns the handler function or undefined if not found/blacklisted.
+   */
+  #dispatch(name: string): ((...args: unknown[]) => Promise<unknown>) | undefined {
+    // Blacklist private/internal methods and transport methods
+    if (name.startsWith("#") || name.startsWith("_") || Server.#blacklist.has(name)) {
+      return undefined;
     }
+
+    const handler = this[name as keyof this];
+    if (handler === undefined || typeof handler !== "function") {
+      return undefined;
+    }
+
+    return handler as (...args: unknown[]) => Promise<unknown>;
   }
 
   // ==========================================================================
   // Response Helpers
   // ==========================================================================
 
-  #successResponse(id: string | number, result: JSONSerializable): JSONRPCResponse {
+  #success(id: string | number, result: JSONSerializable): JSONRPCResponse {
     return { jsonrpc: "2.0", id, result };
   }
 
-  #errorResponse(id: string | number, code: number, message: string): JSONRPCResponse {
+  #error(id: string | number, code: number, message: string): JSONRPCResponse {
     return { jsonrpc: "2.0", id, error: { code, message } };
   }
 }

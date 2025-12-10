@@ -6,7 +6,7 @@
  */
 
 import { assertEquals, assertExists, assertStringIncludes } from "@std/assert";
-import { MCPServer } from "./server.ts";
+import { Server as MCPServer } from "./server.ts";
 import type {
   JSONRPCRequest,
   MCPTool,
@@ -27,7 +27,7 @@ Deno.test("MCPServer: initializes with default config", () => {
 
 Deno.test("MCPServer: initializes with custom config", () => {
   const server = new MCPServer({
-    apiUrl: "http://localhost:8080",
+    api: "http://localhost:8080",
     name: "test-server",
     version: "2.0.0",
   });
@@ -36,7 +36,7 @@ Deno.test("MCPServer: initializes with custom config", () => {
 
 Deno.test("MCPServer: initializes with partial config", () => {
   const server = new MCPServer({
-    apiUrl: "http://localhost:8080",
+    api: "http://localhost:8080",
     // name and version use defaults
   });
   assertExists(server);

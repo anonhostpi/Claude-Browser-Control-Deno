@@ -147,26 +147,6 @@ export type MCPToolHandler<TArgs = JSONObject, TResult = JSONSerializable> =
  */
 export type IContractMCP = API.IContractMCP<MCPToolHandler>;
 
-/**
- * MCP method handler type for JSON-RPC methods
- */
-export type MCPMethodHandler = (request: JSONRPCRequest) => Promise<JSONRPCResponse>;
-
-/**
- * MCP server interface - JSON-RPC methods
- */
-export interface IMCPServer {
-  // JSON-RPC method handlers
-  initialize(request: JSONRPCRequest): Promise<JSONRPCResponse>;
-  "tools/list"(request: JSONRPCRequest): Promise<JSONRPCResponse>;
-  "tools/call"(request: JSONRPCRequest): Promise<JSONRPCResponse>;
-
-  // Main entry points
-  handleRequest(request: JSONRPCRequest): Promise<JSONRPCResponse>;
-  handleNotification(notification: JSONRPCNotification): void;
-  run(): Promise<void>;
-}
-
 // =============================================================================
 // Tool Name Mappings
 // =============================================================================
@@ -224,7 +204,7 @@ export interface NodeToolArgs extends TargetToolArgs {
  */
 export interface MCPServerConfig {
   /** REST API server URL (default: http://localhost:9333) */
-  apiUrl?: string;
+  api?: string;
   /** Server name for MCP initialization */
   name?: string;
   /** Server version for MCP initialization */
